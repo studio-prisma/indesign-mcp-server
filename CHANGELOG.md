@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-06
+
+### Changed
+
+- **A new frame no longer carries InDesign's default stroke.** Every object
+  made by `create_text_frame`, `create_rectangle`, `create_ellipse`,
+  `create_table` and `place_image` was born with the application default of
+  1 pt black, because nothing set a stroke and InDesign fills that in. Nobody
+  asked for it — a caller who wants a stroke names one. It is invisible on a
+  dark ground, draws a box around the element on a light one, and shows up in
+  print long after it stopped being noticeable on screen at 13 % zoom. All
+  five creation sites now clear it unless `strokeColor` is given.
+
+  This changes how documents built by existing calls look, so it is worth
+  reading before upgrading. Nothing breaks: every call still works, and
+  `strokeColor` still applies a stroke exactly as before.
+
+  `create_text_frame` had no `strokeColor` parameter at all, so its frames
+  could not avoid the stroke by any argument. Use `format_object` to put one
+  back.
+
+  The stroke is cleared per object, never through the application preference —
+  changing that would reach outside the document and alter how InDesign
+  behaves for everything else.
+
 ## [2.0.0] - 2026-09-06
 
 A day of using the server against real documents, and fixing what that turned
@@ -188,6 +213,7 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/studio-prisma/indesign-mcp-server/releases/tag/v1.0.0

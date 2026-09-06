@@ -5,7 +5,7 @@
 [![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
 [![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
 [![Tools 83](https://img.shields.io/badge/tools-83-6236ff.svg)](#was-er-kann)
-[![Tests 265](https://img.shields.io/badge/tests-265-brightgreen.svg)](#tests)
+[![Tests 268](https://img.shields.io/badge/tests-268-brightgreen.svg)](#tests)
 
 Adobe InDesign aus Claude Desktop oder einem beliebigen MCP-Client steuern —
 Dokumente aufbauen, Text und Bilder setzen, Bestehendes umgestalten und
@@ -258,7 +258,7 @@ in gesetztem Text, was zählt, wenn exakte Zeichen gebraucht werden.
 | Temp-Dateien | feste Namen im Repo-Verzeichnis | prozess-eigener Ordner unter `os.tmpdir()`, Modus 0700, Aufräumen bei Exit |
 | Argumente | roh in Quelltext eingesetzt | typisiert und geprüft an 366 Einsetzstellen |
 | Rückmeldung | meldet, was getan wurde | meldet, wie das Dokument aussieht |
-| Tests | keine | 265 |
+| Tests | keine | 268 |
 
 Die Argumentprüfung liegt in [lib/jsx-safe.js](lib/jsx-safe.js): `str`, `num`,
 `index`, `measure`, `bool`, `enumOf`, `jsxPath`, `json`, `numList`. Werte, die
@@ -277,7 +277,7 @@ Werkzeug entdeckt werden muss.
 ## Tests
 
 ```bash
-npm test              # 265 Fälle, ohne InDesign
+npm test              # 268 Fälle, ohne InDesign
 npm run lint          # Syntax über alle Module
 npm run verify-api    # DOM-Namen gegen die laufende Anwendung
 ```
