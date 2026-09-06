@@ -38,6 +38,8 @@ import * as flow from './lib/flow-tools.js';
 import * as text from './lib/text-tools.js';
 // Appearance of existing objects.
 import * as style from './lib/style-tools.js';
+// Export and preflight.
+import * as exporters from './lib/export-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -4153,185 +4155,20 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
 
   // =================== EXPORT FUNCTIONS ===================
   async exportPDF(args) {
-    const { filePath, preset = 'HighQualityPrint', pageRange = 'all', includeBleed = false, includeSlug = false, colorProfile, jpegQuality = 'High' } = args;
-
-    // Security: Require confirmation for file export
-    this.validateDestructiveOperation(args, 'EXPORT PDF', filePath);
-
-    // Security: Validate file path
-    const validatedPath = this.validateFilePath(filePath);
-
-    const script = `
-      if (app.documents.length === 0) {
-        "No document open. Please create a document first.";
-      } else {
-        var doc = app.activeDocument;
-        try {
-          var pdfFile = File(${jsxPath(validatedPath)});
-          var pdfPreset;
-          
-          // Try to get the specified preset
-          try {
-            pdfPreset = app.pdfExportPresets.itemByName("[" + ${str(preset)} + "]");
-          } catch (e) {
-            pdfPreset = app.pdfExportPresets[0]; // Use first available preset
-          }
-          
-          // Customize export preferences
-          ${pageRange !== 'all' ? `
-            app.pdfExportPreferences.pageRange = ${str(pageRange)};
-          ` : `
-            app.pdfExportPreferences.pageRange = PageRange.ALL_PAGES;
-          `}
-          
-          app.pdfExportPreferences.includeBleedMarks = ${bool(includeBleed)};
-          app.pdfExportPreferences.includeSlugArea = ${bool(includeSlug)};
-          
-          ${colorProfile ? `
-            app.pdfExportPreferences.outputIntention = OutputIntention.REPURPOSE;
-          ` : ''}
-          
-          // Set JPEG quality
-          if (${str(jpegQuality)} === "Low") {
-            app.pdfExportPreferences.jpegQuality = JPEGOptionsQuality.LOW;
-          } else if (${str(jpegQuality)} === "Medium") {
-            app.pdfExportPreferences.jpegQuality = JPEGOptionsQuality.MEDIUM;
-          } else if (${str(jpegQuality)} === "High") {
-            app.pdfExportPreferences.jpegQuality = JPEGOptionsQuality.HIGH;
-          } else if (${str(jpegQuality)} === "Maximum") {
-            app.pdfExportPreferences.jpegQuality = JPEGOptionsQuality.MAXIMUM;
-          }
-          
-          doc.exportFile(ExportFormat.PDF_TYPE, pdfFile, false, pdfPreset);
-          "PDF exported successfully to: " + ${str(filePath)} + "";
-        } catch (e) {
-          "Error exporting PDF: " + e.message;
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
+    this.validateDestructiveOperation(args, 'EXPORT PDF', args.filePath);
+    const result = await executeInDesignScript(exporters.exportPDF(args));
     return this.formatResponse(result, "Export PDF");
   }
 
   async exportImages(args) {
-    const { folderPath, format = 'PNG', resolution = 300, pageRange = 'all', includeBleed = false } = args;
-
-    // Security: Require confirmation for folder write
-    this.validateDestructiveOperation(args, 'EXPORT IMAGES', folderPath);
-
-    // Security: Validate folder path
-    const validatedPath = this.validateFilePath(folderPath);
-
-    const script = `
-      if (app.documents.length === 0) {
-        "No document open";
-      } else {
-        var doc = app.activeDocument;
-        try {
-          var exportFolder = Folder(${jsxPath(validatedPath)});
-          if (!exportFolder.exists) {
-            exportFolder.create();
-          }
-          
-          var exportFormat;
-          var fileExtension;
-          
-          switch (${str(format)}) {
-            case "PNG":
-              exportFormat = ExportFormat.PNG_FORMAT;
-              fileExtension = ".png";
-              app.pngExportPreferences.resolution = ${num(resolution, { name: 'resolution' })};
-              app.pngExportPreferences.useDocumentBleedWithPDF = ${bool(includeBleed)};
-              break;
-            case "JPEG":
-              exportFormat = ExportFormat.JPG;
-              fileExtension = ".jpg";
-              app.jpegExportPreferences.resolution = ${num(resolution, { name: 'resolution' })};
-              app.jpegExportPreferences.useDocumentBleedWithPDF = ${bool(includeBleed)};
-              break;
-            default:
-              exportFormat = ExportFormat.PNG_FORMAT;
-              fileExtension = ".png";
-          }
-          
-          var pages = [];
-          ${pageRange === 'all' ? `
-            for (var i = 0; i < doc.pages.length; i++) {
-              pages.push(doc.pages[i]);
-            }
-          ` : `
-            // Parse page range (simplified)
-            var pageNumbers = ${str(pageRange)}.split("-");
-            var startPage = parseInt(pageNumbers[0]) - 1;
-            var endPage = pageNumbers.length > 1 ? parseInt(pageNumbers[1]) - 1 : startPage;
-            
-            for (var i = startPage; i <= endPage && i < doc.pages.length; i++) {
-              pages.push(doc.pages[i]);
-            }
-          `}
-          
-          for (var i = 0; i < pages.length; i++) {
-            var page = pages[i];
-            var fileName = doc.name.replace(/\.indd$/i, "") + "_page" + (page.documentOffset + 1) + fileExtension;
-            var exportFile = File(exportFolder + "/" + fileName);
-            
-            page.exportFile(exportFormat, exportFile);
-          }
-          
-          "Exported " + pages.length + " pages as " + ${str(format)} + " files to: " + ${str(folderPath)} + "";
-        } catch (e) {
-          "Error exporting images: " + e.message;
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
+    this.validateDestructiveOperation(args, 'EXPORT IMAGES', args.folderPath);
+    const result = await executeInDesignScript(exporters.exportImages(args));
     return this.formatResponse(result, "Export Images");
   }
 
   async exportEPUB(args) {
-    const { filePath, version = 'EPUB3', includeImages = true, imageFormat = 'PNG' } = args;
-
-    // Security: Require confirmation for file export
-    this.validateDestructiveOperation(args, 'EXPORT EPUB', filePath);
-
-    // Security: Validate file path
-    const validatedPath = this.validateFilePath(filePath);
-
-    const script = `
-      if (app.documents.length === 0) {
-        "No document open";
-      } else {
-        var doc = app.activeDocument;
-        try {
-          var epubFile = File(${jsxPath(validatedPath)});
-          
-          // Set EPUB export preferences
-          var epubExportPrefs = app.epubExportPreferences;
-          epubExportPrefs.epubVersion = ${version === 'EPUB3' ? 'EPubVersion.EPUB_VERSION_3' : 'EPubVersion.EPUB_VERSION_2'};
-          epubExportPrefs.preserveLocalOverride = true;
-          
-          ${includeImages ? `
-            epubExportPrefs.imageConversion = ImageConversion.AUTOMATIC;
-            if (${str(imageFormat)} === "PNG") {
-              epubExportPrefs.pngQualityLevel = PNGQualityLevel.HIGH;
-            } else if (${str(imageFormat)} === "JPEG") {
-              epubExportPrefs.jpegOptionsQuality = JPEGOptionsQuality.HIGH;
-            }
-          ` : `
-            epubExportPrefs.imageConversion = ImageConversion.LINK_TO_SERVER;
-          `}
-          
-          doc.exportFile(ExportFormat.EPUB, epubFile);
-          "EPUB exported successfully to: " + ${jsxPath(validatedPath)} + "";
-        } catch (e) {
-          "Error exporting EPUB: " + e.message;
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
+    this.validateDestructiveOperation(args, 'EXPORT EPUB', args.filePath);
+    const result = await executeInDesignScript(exporters.exportEPUB(args));
     return this.formatResponse(result, "Export EPUB");
   }
 
@@ -4589,37 +4426,8 @@ Usage: INDESIGN_ALLOW_ARBITRARY_CODE=1 node index.js`
 
   // =================== ADDITIONAL UTILITIES ===================
   async preflightDocument(args) {
-    const { profile, scope = 'document' } = args;
-
-    const script = `
-      if (app.documents.length === 0) {
-        "No document open";
-      } else {
-        var doc = app.activeDocument;
-        try {
-          var preflightProfile;
-          
-          ${profile ? `
-            preflightProfile = app.preflightProfiles.itemByName(${str(profile)});
-            if (!preflightProfile.isValid) {
-              preflightProfile = app.preflightProfiles[0];
-            }
-          ` : `
-            preflightProfile = app.preflightProfiles[0];
-          `}
-          
-          var preflightResults = doc.preflightProcesses.add(preflightProfile);
-          var errorCount = preflightResults.preflightResultsData.length;
-          
-          "Preflight check completed. Found " + errorCount + " issues.";
-        } catch (e) {
-          "Error running preflight: " + e.message;
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
-    return this.formatResponse(result, "Preflight Document");
+    const result = await executeInDesignScript(exporters.preflightDocument(args));
+    return this.formatResponse(result, "Preflight");
   }
 
   async zoomToPage(args) {

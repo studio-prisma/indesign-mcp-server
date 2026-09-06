@@ -294,6 +294,45 @@ Beide gegen InDesign 21.5 verifiziert, beide zuvor falsch in diesem Server:
   selbst nicht annahm.
 
 
+
+## Wenn ein Werkzeug ohne erkennbaren Grund scheitert
+
+InDesign ignoriert eine Eigenschaft nicht, die es nicht kennt - es wirft, und
+der gesamte Aufruf bricht ab. Ein Werkzeug, das einen Namen zu viel setzt,
+scheitert vollstaendig; das sieht aus, als taete es nichts, nicht nach einem
+Namensproblem. Mehrere Werkzeuge trugen Namen aus aelteren Versionen und
+scheiterten genau so.
+
+```bash
+npm run verify-api
+```
+
+prueft jede DOM-Eigenschaft und jedes Enum-Mitglied, das dieser Server
+schreibt, gegen die laufende Anwendung und endet mit Fehlercode, wenn etwas
+fehlt. Nach einem InDesign-Update lohnt der Lauf, und als Erstes, wenn ein
+Werkzeug sich ohne klaren Grund merkwuerdig verhaelt.
+
+Was er gefunden hat, alles in InDesign 21.5:
+
+| der Server setzte | die Version kennt |
+|---|---|
+| `pdfExportPreferences.includeBleedMarks` | `bleedMarks` |
+| `pdfExportPreferences.includeSlugArea` | `includeSlugWithPDF` |
+| `pdfExportPreferences.outputIntention` | nichts Entsprechendes |
+| `jpeg`/`pngExportPreferences.resolution` | `exportResolution` |
+| `useDocumentBleedWithPDF` bei Bildern | `useDocumentBleeds` |
+| `app.epubExportPreferences` | ersatzlos entfallen |
+| `findTextPreferences.caseSensitive` | `findChangeTextOptions.caseSensitive` |
+| `rectangle.cornerRadius` | `topLeftCornerRadius` und Geschwister |
+| `Justification.JUSTIFY` | `FULLY_JUSTIFIED` und drei weitere |
+
+Preflight hatte dasselbe Problem in anderer Form: Die Prozess-Sammlung liegt
+auf `app` und nimmt das Dokument als Argument, die Ergebnisse stehen in
+`aggregatedResults` statt in `preflightResultsData`, und der Prozess laeuft
+asynchron - ohne `waitForProcess()` werden die Ergebnisse gelesen, bevor er
+fertig ist.
+
+
 ## Tests
 
 ```bash

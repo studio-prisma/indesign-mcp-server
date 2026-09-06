@@ -282,6 +282,43 @@ Both verified against InDesign 21.5, both previously wrong in this server:
   then rejected — the tool suggested a value it would not accept.
 
 
+
+## When a tool fails for no visible reason
+
+InDesign does not ignore a property it does not have - it raises, and the
+whole call aborts. A tool that sets one name too many fails entirely, which
+looks like the tool doing nothing rather than like a naming problem. Several
+tools here carried names from older versions and failed exactly that way.
+
+```bash
+npm run verify-api
+```
+
+checks every DOM property and enum member this server writes against the
+running application, and exits non-zero if any is missing. Worth running after
+an InDesign upgrade, and first whenever a tool misbehaves for no clear reason.
+
+What it caught, all in InDesign 21.5:
+
+| the server set | the version has |
+|---|---|
+| `pdfExportPreferences.includeBleedMarks` | `bleedMarks` |
+| `pdfExportPreferences.includeSlugArea` | `includeSlugWithPDF` |
+| `pdfExportPreferences.outputIntention` | nothing equivalent |
+| `jpeg`/`pngExportPreferences.resolution` | `exportResolution` |
+| image `useDocumentBleedWithPDF` | `useDocumentBleeds` |
+| `app.epubExportPreferences` | gone entirely |
+| `findTextPreferences.caseSensitive` | `findChangeTextOptions.caseSensitive` |
+| `rectangle.cornerRadius` | `topLeftCornerRadius` and siblings |
+| `Justification.JUSTIFY` | `FULLY_JUSTIFIED` and three more |
+
+Preflight had a different shape of the same problem: the processes collection
+is on `app` and takes the document as an argument, results live in
+`aggregatedResults` rather than `preflightResultsData`, and the process runs
+asynchronously - without `waitForProcess()` the results are read before it has
+finished.
+
+
 ## Tests
 
 ```bash
