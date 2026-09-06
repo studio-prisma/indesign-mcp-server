@@ -1,12 +1,18 @@
 name: Bug report
-description: Something does not work as documented
+description: A tool does not do what it says, or fails for no visible reason
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Please do **not** paste your Cloudflare secret key, ticket contents, or customer
-        data into this form. Redact hostnames if they are not public.
+        Please do **not** paste document contents, client names, or absolute
+        paths containing your user name into this form.
+
+        Before filing: if a tool fails without an explanation, run
+        `npm run verify-api` against your InDesign first. A DOM property this
+        version dropped aborts the whole call, which looks exactly like the
+        tool doing nothing — and the report is far more useful with that
+        output in it.
 
   - type: textarea
     id: what-happened
@@ -20,34 +26,47 @@ body:
     id: reproduce
     attributes:
       label: Steps to reproduce
+      description: The tool calls and their arguments, if you have them.
       placeholder: |
-        1. Enable "Client login"
-        2. Open /login.php in a private window
-        3. ...
+        1. create_document with preset A4
+        2. create_text_frame at x 20, y 20, 100 x 40 mm
+        3. inspect_page reports ...
     validations:
       required: true
 
   - type: input
-    id: osticket-version
+    id: indesign-version
     attributes:
-      label: osTicket version
-      placeholder: "1.18.4"
+      label: InDesign version
+      description: Help → About, or the value `npm run smoke` prints.
+      placeholder: "21.5.1.73"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows (PowerShell + COM)
+        - macOS (osascript)
     validations:
       required: true
 
   - type: input
-    id: php-version
+    id: node-version
     attributes:
-      label: PHP version
-      placeholder: "8.3.33"
+      label: Node version
+      placeholder: "20.11.0"
     validations:
       required: true
 
   - type: input
-    id: plugin-version
+    id: server-version
     attributes:
-      label: Plugin version
-      placeholder: "1.0.0"
+      label: Server version
+      description: From package.json, or the version your MCP client reports.
+      placeholder: "2.2.0"
     validations:
       required: true
 
@@ -56,31 +75,29 @@ body:
     attributes:
       label: Affected area
       options:
-        - Guest ticket form
-        - Client registration
-        - Client login
-        - Staff login
-        - Plugin configuration
-        - Content-Security-Policy
+        - Seeing the document (inspect_page, check_layout, get_text_content)
+        - Building pages (documents, frames, shapes, images, tables)
+        - Changing what is there (move, resize, format, effects)
+        - Text and styles
+        - Output (PDF, images, EPUB, IDML, package, preflight)
+        - Generic access (inspect_object, set_properties, call_method)
+        - The driver itself (connection, undo, temp files)
         - Other / unclear
     validations:
       required: true
 
-  - type: dropdown
-    id: fail-mode
+  - type: textarea
+    id: verify-api
     attributes:
-      label: Fail mode
-      options:
-        - closed
-        - open
-    validations:
-      required: true
+      label: verify-api output
+      description: The output of `npm run verify-api`, if it reported anything missing.
+      render: text
 
   - type: textarea
-    id: logs
+    id: message
     attributes:
-      label: Relevant log lines
-      description: PHP error log entries containing "turnstile". Redact IPs if needed.
+      label: What the tool returned
+      description: The full message, including any ERROR line.
       render: text
 
   - type: checkboxes
@@ -88,8 +105,8 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: I tested in a fresh private window (no reused cookie jar)
+        - label: InDesign was running with no modal dialog open — a dialog blocks every scripted call until it is dismissed
           required: true
-        - label: The browser console shows no CSP error for challenges.cloudflare.com
-        - label: I have removed all secrets and customer data from this report
+        - label: I ran `npm run verify-api` and pasted anything it reported
+        - label: I have removed document contents and personal paths from this report
           required: true
