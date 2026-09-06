@@ -1,12 +1,36 @@
 name: Feature request
-description: Suggest a capability this plugin does not have yet
+description: Suggest a capability this server does not have yet
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Check first whether `set_properties` and `call_method` already reach
+        what you need. They set any property of any object and call an
+        allow-listed method, which covers most of the DOM without a new tool.
+        `inspect_object` without a property list enumerates what an object
+        offers, so you can find out before asking.
+
+        A tool is warranted when the generic layer genuinely cannot get there
+        — creating a new kind of object, or a method call on a collection.
+        More tools are not free: every one of them makes it harder for a model
+        to pick the right one.
+
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: What are you trying to achieve that the plugin does not support today?
+      description: What are you trying to do that the server does not support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: generic
+    attributes:
+      label: What happened when you tried the generic layer
+      description: |
+        The `set_properties` or `call_method` call you tried, and what came
+        back. "Not applicable" is a fine answer if the thing needs creating.
     validations:
       required: true
 
@@ -14,21 +38,24 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
+      description: |
+        If you know the DOM objects and properties involved, name them. A
+        request that says which collection and which method is most of the
+        work already done.
     validations:
       required: true
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives considered
 
   - type: checkboxes
     id: scope
     attributes:
       label: Scope check
       description: |
-        This plugin covers browser-based Turnstile verification for osTicket.
-        Email ticket intake and the JSON API are deliberately out of scope.
+        This server drives InDesign through the scripting DOM, on Windows and
+        macOS. Running arbitrary ExtendScript is deliberately out of scope —
+        `execute_indesign_code` stays disabled, and the generic tools pass
+        data, never statements.
       options:
         - label: My request stays within that scope
+          required: true
+        - label: I checked whether `set_properties` or `call_method` already covers it
           required: true

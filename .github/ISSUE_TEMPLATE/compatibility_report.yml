@@ -1,28 +1,49 @@
 name: Compatibility report
-description: Report the plugin working (or breaking) on a version combination not listed yet
+description: Report the server working (or breaking) on an InDesign version not listed yet
 labels: ["compatibility"]
 body:
-  - type: input
-    id: osticket-version
+  - type: markdown
     attributes:
-      label: osTicket version
-      placeholder: "1.18.6"
+      value: |
+        Only Windows 11 with InDesign 21.5 is verified. Everything else should
+        work through the generic ProgID or the macOS application names, but
+        nobody has confirmed it — which is why these reports are worth more
+        here than in most projects.
+
+        `npm run verify-api` is the useful part: it checks every DOM property
+        and enum member the server writes against your InDesign and names the
+        ones that are missing. A version that drops or renames a property is
+        exactly what this report should capture.
+
+  - type: input
+    id: indesign-version
+    attributes:
+      label: InDesign version
+      placeholder: "20.2.0.90"
     validations:
       required: true
 
   - type: input
-    id: php-version
+    id: os-version
     attributes:
-      label: PHP version
-      placeholder: "8.4.2"
+      label: Operating system
+      placeholder: "Windows 11 26100 / macOS 15.3"
     validations:
       required: true
 
   - type: input
-    id: plugin-version
+    id: node-version
     attributes:
-      label: Plugin version
-      placeholder: "1.0.0"
+      label: Node version
+      placeholder: "20.11.0"
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      placeholder: "2.2.0"
     validations:
       required: true
 
@@ -31,17 +52,27 @@ body:
     attributes:
       label: Result
       options:
-        - Works — all four protected areas
-        - Works — guest ticket form only
-        - Partially broken
-        - Does not work
+        - Works — smoke, tests and verify-api all clean
+        - Works — but verify-api reports missing names
+        - Partially broken — some tools fail
+        - Does not connect at all
     validations:
       required: true
+
+  - type: textarea
+    id: verify-api
+    attributes:
+      label: verify-api output
+      description: Paste the whole run, including the summary line.
+      render: text
 
   - type: textarea
     id: details
     attributes:
       label: Details
-      description: Which areas did you test, and what did you observe?
+      description: |
+        Which end-to-end scripts did you run, and what did you observe? If the
+        server could not connect at all, the registered ProgID (Windows) or
+        application name (macOS) is the thing to include.
     validations:
       required: true
