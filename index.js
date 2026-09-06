@@ -42,6 +42,8 @@ import * as style from './lib/style-tools.js';
 import * as exporters from './lib/export-tools.js';
 // Effects, gradients, tables, paragraphs.
 import * as fx from './lib/effect-tools.js';
+// Generic property access for everything the specialised tools do not reach.
+import * as generic from './lib/generic-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -1529,6 +1531,162 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             required: ['frameIndex']
           }
         },
+        {
+          name: 'inspect_object',
+          description:
+            'Read any object in the document. Without "properties" it lists ' +
+            'every readable property and its value, which is how to find out ' +
+            'what an object offers - useful when no specialised tool covers ' +
+            'what you need. With "properties" it reads just those, and says so ' +
+            'when one is not available on that object. Use this together with ' +
+            'set_properties to reach anything the other tools do not.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              target: {
+                type: 'object',
+                description:
+                  'Which object. kind plus the indices or name it needs: ' +
+                  'pageItem needs objectIndex (from inspect_page), textFrame ' +
+                  'needs frameIndex, story/paragraph/character need storyIndex ' +
+                  'and itemIndex, cell needs tableIndex/row/column, and layer, ' +
+                  'swatch and the style kinds need name.',
+                properties: {
+                  kind: {
+                    type: 'string',
+                    enum: ['document', 'page', 'pageItem', 'textFrame', 'story',
+                           'paragraph', 'character', 'table', 'cell', 'row',
+                           'column', 'layer', 'swatch', 'paragraphStyle',
+                           'characterStyle', 'objectStyle', 'masterSpread',
+                           'application'],
+                    default: 'pageItem'
+                  },
+                  pageIndex: { type: 'number', default: 0 },
+                  objectIndex: { type: 'number' },
+                  frameIndex: { type: 'number' },
+                  storyIndex: { type: 'number' },
+                  itemIndex: { type: 'number' },
+                  tableIndex: { type: 'number' },
+                  row: { type: 'number' },
+                  column: { type: 'number' },
+                  name: { type: 'string' }
+                },
+                required: ['kind']
+              },
+              properties: {
+                type: 'array', items: { type: 'string' },
+                description: 'Property paths, e.g. "fillColor" or ' +
+                  '"transparencySettings.dropShadowSettings.opacity". Omit to list everything.'
+              },
+              maxProperties: { type: 'number', description: 'Cap when listing', default: 80 }
+            },
+            required: ['target']
+          }
+        },
+        {
+          name: 'set_properties',
+          description:
+            'Set any properties on any object - the general form behind the ' +
+            'specialised tools, for everything they do not cover. Values are ' +
+            'numbers, strings, booleans, arrays, or one of three tagged forms: ' +
+            '{ enum: "Justification.CENTER_ALIGN" } for enum members, ' +
+            '{ swatch: "Black" } for colours, { measure: 20, unit: "mm" } for ' +
+            'lengths. Each assignment is guarded separately, so a property this ' +
+            'InDesign version does not have is reported without taking the ' +
+            'others with it. Use inspect_object first to see what exists.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              target: {
+                type: 'object',
+                description:
+                  'Which object. kind plus the indices or name it needs: ' +
+                  'pageItem needs objectIndex (from inspect_page), textFrame ' +
+                  'needs frameIndex, story/paragraph/character need storyIndex ' +
+                  'and itemIndex, cell needs tableIndex/row/column, and layer, ' +
+                  'swatch and the style kinds need name.',
+                properties: {
+                  kind: {
+                    type: 'string',
+                    enum: ['document', 'page', 'pageItem', 'textFrame', 'story',
+                           'paragraph', 'character', 'table', 'cell', 'row',
+                           'column', 'layer', 'swatch', 'paragraphStyle',
+                           'characterStyle', 'objectStyle', 'masterSpread',
+                           'application'],
+                    default: 'pageItem'
+                  },
+                  pageIndex: { type: 'number', default: 0 },
+                  objectIndex: { type: 'number' },
+                  frameIndex: { type: 'number' },
+                  storyIndex: { type: 'number' },
+                  itemIndex: { type: 'number' },
+                  tableIndex: { type: 'number' },
+                  row: { type: 'number' },
+                  column: { type: 'number' },
+                  name: { type: 'string' }
+                },
+                required: ['kind']
+              },
+              properties: {
+                type: 'object',
+                description: 'Map of property path to value, up to 40 entries'
+              }
+            },
+            required: ['target', 'properties']
+          }
+        },
+        {
+          name: 'call_method',
+          description:
+            'Call a method on an object, from a fixed list: fit, remove, ' +
+            'bringToFront, bringForward, sendBackward, sendToBack, flipItem, ' +
+            'move, resize, duplicate, select, clearTransformations, detach, ' +
+            'override, changeText, changeGrep, merge, unmerge, convertToText, ' +
+            'ungroup, recompose, save, exportFile. Arguments are typed like ' +
+            'property values. Methods outside the list are refused - this is a ' +
+            'way to act on objects, not a way to run scripts.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              target: {
+                type: 'object',
+                description:
+                  'Which object. kind plus the indices or name it needs: ' +
+                  'pageItem needs objectIndex (from inspect_page), textFrame ' +
+                  'needs frameIndex, story/paragraph/character need storyIndex ' +
+                  'and itemIndex, cell needs tableIndex/row/column, and layer, ' +
+                  'swatch and the style kinds need name.',
+                properties: {
+                  kind: {
+                    type: 'string',
+                    enum: ['document', 'page', 'pageItem', 'textFrame', 'story',
+                           'paragraph', 'character', 'table', 'cell', 'row',
+                           'column', 'layer', 'swatch', 'paragraphStyle',
+                           'characterStyle', 'objectStyle', 'masterSpread',
+                           'application'],
+                    default: 'pageItem'
+                  },
+                  pageIndex: { type: 'number', default: 0 },
+                  objectIndex: { type: 'number' },
+                  frameIndex: { type: 'number' },
+                  storyIndex: { type: 'number' },
+                  itemIndex: { type: 'number' },
+                  tableIndex: { type: 'number' },
+                  row: { type: 'number' },
+                  column: { type: 'number' },
+                  name: { type: 'string' }
+                },
+                required: ['kind']
+              },
+              method: { type: 'string', description: 'One of the allowed methods' },
+              args: {
+                type: 'array',
+                description: 'Typed arguments, at most six'
+              }
+            },
+            required: ['target', 'method']
+          }
+        },
       ],
     }));
 
@@ -1570,6 +1728,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           case 'place_image': return await this.placeImage(args);
 
             // Layout inspection and object manipulation
+            // Generic access
+            case 'inspect_object': return await this.inspectObject(args);
+            case 'set_properties': return await this.setProperties(args);
+            case 'call_method': return await this.callMethod(args);
+
             case 'inspect_page': return await this.inspectPage(args);
             case 'check_layout': return await this.checkLayout(args);
             case 'move_object': return await this.moveObject(args);
@@ -3444,6 +3607,23 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   async undoSteps(args = {}) {
     const result = await executeInDesignScript(flow.undoSteps(args));
     return this.formatResponse(result, "Undo");
+  }
+
+  // =================== GENERIC ACCESS ===================
+
+  async inspectObject(args) {
+    const result = await executeInDesignScript(generic.inspectObject(args));
+    return this.formatResponse(result, "Inspect Object");
+  }
+
+  async setProperties(args) {
+    const result = await executeInDesignScript(generic.setProperties(args));
+    return this.formatResponse(result, "Set Properties");
+  }
+
+  async callMethod(args) {
+    const result = await executeInDesignScript(generic.callMethod(args));
+    return this.formatResponse(result, "Call Method");
   }
 
   // =================== LAYOUT INSPECTION & OBJECTS ===================

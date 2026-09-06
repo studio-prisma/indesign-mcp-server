@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `inspect_object`, `set_properties`, `call_method` - generic access to every
+  DOM object, for everything the specialised tools do not wrap. Property paths,
+  enum references and method names are validated as data; none of them can
+  carry code, which is what separates this from `execute_indesign_code`.
+
 - `apply_effect` - all nine effects and the sixteen blend modes, replacing the
   shadow-only `apply_shadow`.
 - `create_gradient`, `format_table`, `format_paragraph` - gradients, table cell
