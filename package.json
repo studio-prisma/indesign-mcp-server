@@ -1,12 +1,16 @@
 {
   "name": "indesign-mcp-server",
   "version": "1.0.0",
-  "description": "A comprehensive Model Context Protocol (MCP) server for Adobe InDesign automation with 51+ professional tools",
+  "description": "MCP server for Adobe InDesign automation. Windows and macOS, with validated tool arguments and a test suite.",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --inspect index.js"
+    "dev": "node --inspect index.js",
+    "test": "node --test test/scripts.test.mjs test/injection.test.mjs",
+    "lint": "node --check index.js && node --check lib/indesign-driver.js && node --check lib/jsx-safe.js",
+    "smoke": "node scripts/smoke.mjs",
+    "e2e": "node scripts/e2e.mjs"
   },
   "keywords": [
     "mcp",
@@ -16,22 +20,29 @@
     "automation",
     "publishing",
     "desktop-publishing",
-    "claude"
+    "windows"
   ],
-  "author": "lucdesign",
+  "author": "studio-prisma",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0"
+    "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lucdesign/indesign-mcp-server.git"
+    "url": "git+https://github.com/studio-prisma/indesign-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/lucdesign/indesign-mcp-server/issues"
+    "url": "https://github.com/studio-prisma/indesign-mcp-server/issues"
   },
-  "homepage": "https://github.com/lucdesign/indesign-mcp-server#readme"
+  "homepage": "https://github.com/studio-prisma/indesign-mcp-server#readme",
+  "files": [
+    "index.js",
+    "lib/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ]
 }
