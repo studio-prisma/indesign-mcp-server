@@ -7,99 +7,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-06
+
+A day of using the server against real documents, and fixing what that turned
+up. The version is a major because `apply_shadow` is gone: a call that worked
+before does not exist any more.
+
+The theme running through it: the server could report what it did, but not
+what the document looked like afterwards, and several tools set property names
+InDesign 21.5 no longer has — which does not fail quietly, it aborts the whole
+call and looks like the tool doing nothing.
+
 ### Added
 
-- `inspect_object`, `set_properties`, `call_method` - generic access to every
-  DOM object, for everything the specialised tools do not wrap. Property paths,
-  enum references and method names are validated as data; none of them can
-  carry code, which is what separates this from `execute_indesign_code`.
+**Seeing the document**
 
-- `apply_effect` - all nine effects and the sixteen blend modes, replacing the
-  shadow-only `apply_shadow`.
-- `create_gradient`, `format_table`, `format_paragraph` - gradients, table cell
-  formatting and paragraph settings, none of which the server could do.
+- `inspect_page` — every object with type, position, size, layer and state,
+  front to back. The index it prints addresses the object in the tools below.
+- `check_layout` — overset text, frames with no artwork and no fill, objects
+  past the page edge, and overlapping objects with the shared area.
+- `find_text` — search without changing anything, reporting each hit with its
+  page, frame and context. `find_replace_text` always replaced, so there was no
+  way to look before changing.
+- `inspect_object` — read any object, or list everything it offers.
 
-- `npm run verify-api` - checks every DOM property and enum member the server
-  writes against the running InDesign and fails if one is missing. This class
-  of bug is invisible to code review and to the test suite; only the
-  application can answer it.
+**Changing what exists**
 
-- `format_object`, `apply_shadow`, `transform_content`, `format_text` -
-  changing fill, stroke, corners, opacity, shadow, the artwork inside a frame,
-  and character formatting on objects that already exist. Creating an object
-  was covered; changing one afterwards was not.
-
+- `move_object`, `resize_object`, `delete_object`, `arrange_object`,
+  `fit_frame` — the server could create objects but not move, resize, delete
+  or restack them.
+- `format_object`, `transform_content`, `format_text`, `format_paragraph` —
+  fill, stroke, corners, opacity, the artwork inside a frame, character and
+  paragraph formatting on objects that already exist.
+- `apply_effect` — all nine effects and the sixteen blend modes.
+- `create_gradient`, `format_table` — gradients and table cell formatting.
 - `align_objects`, `distribute_objects`, `group_objects`, `ungroup_objects`,
-  `transform_object` - arranging and transforming, none of which the server
-  could do.
-- `thread_text_frames` - run a story across frames and pages. Takes
+  `transform_object`.
+
+**Multi-page documents**
+
+- `thread_text_frames` — run a story across frames and pages. Takes
   `readingOrder: true` to thread by position, because the index order is
   inverted and threading by ascending index runs the story backwards up the
   page.
 - `set_text_frame_options` (columns, gutter, inset, vertical alignment) and
   `set_text_wrap`.
-- `list_master_pages`, `apply_master_page`, `insert_page_number` - the basis
-  for multi-page documents.
-- `list_links`, `update_links` - a missing link exports at preview resolution
+- `list_master_pages`, `apply_master_page`, `insert_page_number`.
+- `list_links`, `update_links` — a missing link exports at preview resolution
   without raising anything.
-- `undo` - a recovery path when a call did the wrong thing.
-- `inspect_page` - every object on a page with type, position, size, layer and
-  state, front to back. The index it prints addresses the object in the tools
-  below.
-- `check_layout` - overset text, frames with no artwork and no fill, objects
-  past the page edge, and overlapping objects with the shared area.
-- `move_object`, `resize_object`, `delete_object`, `arrange_object`,
-  `fit_frame` - the server could create objects but not move, resize, delete
-  or restack them.
+- `undo` — a recovery path when a call did the wrong thing.
+
+**Generic access**
+
+- `set_properties`, `call_method` — reach every property of every object, for
+  everything the specialised tools do not wrap. Property paths, enum
+  references and method names are validated as data; none can carry code,
+  which is what separates this from `execute_indesign_code`.
+
+**Tooling**
+
+- `npm run verify-api` — checks every DOM property and enum member the server
+  writes against the running InDesign and fails if one is missing. This class
+  of bug is invisible to code review and to the test suite; only the
+  application can answer it.
+- End-to-end scripts per area, each labelling the document it creates and
+  closing only that one.
 
 ### Changed
 
-- `apply_shadow` is gone, replaced by `apply_effect`. Adding a second tool
-  beside it would have meant two ways to do the same thing.
-- `verify-api` now also covers the effect settings objects, table cells,
-  paragraph attributes and gradients: 238 properties and enum members.
-
-- `place_image` verifies that the import produced artwork instead of reporting
-  success either way. A malformed SVG leaves an empty frame behind in
-  InDesign without raising; the tool now removes it and returns an error
-  naming the file. On success it reports frame and artwork bounds and warns
-  when the artwork is cropped.
-- `place_image` handles every fit option it accepts. `FILL_PROPORTIONALLY` and
-  `APPLY_FRAME_FITTING_OPTIONS` were in the allowed list but missing from the
-  switch, so passing either applied no fit at all and left the image at its
-  original size inside the frame.
-- `fontSize` descriptions state that the value is in points while the geometry
-  parameters are in millimetres, and a point size below 4 pt comes back with a
-  note suggesting the conversion.
+- **Windows support.** Scripts run through PowerShell and the InDesign COM
+  interface. macOS keeps using `osascript`.
+- **Every tool argument is validated** before it becomes part of an
+  ExtendScript source — 366 interpolation sites. Values that cannot be
+  represented are rejected rather than passed through.
+- **`apply_shadow` is gone,** replaced by `apply_effect`. A second tool beside
+  it would have meant two ways to do the same thing.
+- `get_text_content` takes a `scope` — document, page, frame or selection. It
+  previously looked only at the selection or one named frame, so with neither
+  it returned nothing and no explanation.
+- `place_image` verifies the import produced artwork, removes the empty frame
+  and names the file when it did not, and reports whether the artwork is
+  cropped.
+- Temp files moved to a per-process directory under `os.tmpdir()` with random
+  names and mode 0700, cleaned up on exit. Concurrent calls no longer collide.
+- `@modelcontextprotocol/sdk` from `^0.5.0` to `^1.30.0`.
+- The driver explains two failures it used to pass through raw: a modal dialog
+  blocking every scripted call, and the COM integrity-level mismatch.
 
 ### Fixed
 
-- `export_pdf`, `export_images`, `export_epub` and `preflight_document` each
-  set a property InDesign 21.5 does not have, which aborts the whole call
-  rather than being ignored. Corrected: `includeBleedMarks` to `bleedMarks`,
-  `includeSlugArea` to `includeSlugWithPDF`, `outputIntention` dropped,
-  image `resolution` to `exportResolution`, image `useDocumentBleedWithPDF`
-  to `useDocumentBleeds`, and `app.epubExportPreferences` removed - it no
-  longer exists, so EPUB exports with the application's current settings.
+**Property names this InDesign version does not have.** Each of these aborted
+the whole call:
+
+- `findTextPreferences.caseSensitive` and `.wholeWord` → they belong to
+  `findChangeTextOptions`. Every case-sensitive search failed outright.
+- `rectangle.cornerRadius` → each corner carries its own
+  (`topLeftCornerRadius` and siblings).
+- `Justification.JUSTIFY` → does not exist; four tool schemas offered it, so
+  the validator rejected a value the tools themselves suggested.
+- `pdfExportPreferences.includeBleedMarks` → `bleedMarks`,
+  `.includeSlugArea` → `includeSlugWithPDF`, `.outputIntention` → dropped.
+- Image export `.resolution` → `exportResolution`,
+  `.useDocumentBleedWithPDF` → `useDocumentBleeds`.
+- `app.epubExportPreferences` → gone entirely; EPUB exports with the
+  application's current settings.
+
+**Other**
+
+- The destructive-operation confirmation did not gate.
+  `validateDestructiveOperation` called an async method that only throws
+  without awaiting it, so the rejection surfaced as an unhandled rejection
+  while the operation carried on. Affected close without saving, delete page,
+  the exports, package and data merge.
 - `preflight_document` used `doc.preflightProcesses` (the collection is on
   `app` and takes the document), read `preflightResultsData` (it is
-  `aggregatedResults`), and did not wait for the asynchronous process to
-  finish before reading its results.
-- Exports now report a missing output file instead of assuming success.
-
-- `create_rectangle` set `rect.cornerRadius`, which a rectangle does not have -
-  passing a corner radius raised at runtime. Each corner carries its own
-  radius and option; all four are now set.
-- Four tool schemas offered `JUSTIFY` as an alignment. `Justification` has no
-  such member, so the validator rejected a value the tools themselves
-  suggested. Replaced with the four `_JUSTIFIED` members.
-
-- The confirmation gate for destructive operations did not gate.
-  `validateDestructiveOperation` called an async method that only throws,
-  without awaiting it, so the rejection surfaced as an unhandled rejection
-  while the caller carried on. Affected close without saving, delete page,
-  the exports, package and data merge.
-
+  `aggregatedResults`), and did not wait for the asynchronous process.
+- Return values: scripts return their result as a trailing expression, which
+  the executor assigns to a result variable. That assignment was applied per
+  line, so an expression spanning several lines received the prefix in the
+  middle — a syntax error. `create_document` was affected.
+- `fix_typography_in_selection` contained a literal made of three quote
+  characters, which is not valid JavaScript.
+- `insert_markdown_text` emitted a template literal into the ExtendScript;
+  ExtendScript is ES3 and has no template literals.
+- `INDESIGN_ALLOWED_DIRS` split on `:`, tearing Windows drive letters apart.
+- Path validation was POSIX-only, leaving `C:\Windows\System32` unprotected.
+- Exports report a missing output file instead of assuming success.
+- `place_image` handled only four of the six fit options it accepted, so
+  passing `FILL_PROPORTIONALLY` applied no fit at all — which looks exactly
+  like the image being cropped.
 
 ## [1.0.0] - 2026-09-06
 
@@ -152,5 +188,6 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/studio-prisma/indesign-mcp-server/releases/tag/v1.0.0

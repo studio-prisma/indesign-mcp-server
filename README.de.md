@@ -1,8 +1,9 @@
 # indesign-mcp-server
 
-Ein MCP-Server, der Adobe InDesign aus einem MCP-Client wie Claude Desktop
-steuert. Dokumente anlegen, Text und Bilder setzen, Stile anwenden, PDF
-exportieren — rund fünfzig Werkzeuge.
+Ein MCP-Server, der Adobe InDesign aus einem Client wie Claude Desktop
+steuert. Dokumente aufbauen, Text und Bilder setzen, Bestehendes umgestalten
+und umsortieren, das Ergebnis prüfen und exportieren — 83 Werkzeuge, dazu
+generischer Zugriff auf alles, was sie nicht abdecken.
 
 Läuft unter **Windows** (PowerShell + COM) und **macOS** (osascript).
 
@@ -10,8 +11,8 @@ English version: [README.md](README.md)
 
 > Fork von [lucdesign/indesign-mcp-server](https://github.com/lucdesign/indesign-mcp-server),
 > das nur unter macOS läuft. Dieser Fork ergänzt Windows-Unterstützung, prüft
-> jedes Werkzeug-Argument, bevor es InDesign erreicht, und bringt Tests mit.
-> Siehe [Unterschiede zum Ausgangsprojekt](#unterschiede-zum-ausgangsprojekt).
+> jedes Werkzeug-Argument, berichtet, wie das Dokument tatsächlich aussieht,
+> und bringt Tests mit. Siehe [Unterschiede zum Ausgangsprojekt](#unterschiede-zum-ausgangsprojekt).
 
 ---
 
@@ -21,7 +22,7 @@ English version: [README.md](README.md)
 - Adobe InDesign, **gestartet**, im selben Benutzerkontext wie Node
 
 Der zweite Punkt ist keine Formalie. COM trennt über Integritätsstufen: Läuft
-InDesign als Administrator und Node nicht (oder umgekehrt), findet Node das
+InDesign als Administrator und Node nicht oder umgekehrt, findet Node das
 COM-Objekt nicht.
 
 ## Einrichten
@@ -31,8 +32,7 @@ npm ci
 npm run smoke
 ```
 
-`npm run smoke` liest nur Name und Version der Anwendung und fasst kein
-Dokument an. Erwartete Ausgabe:
+`npm run smoke` liest Name und Version und fasst kein Dokument an:
 
 ```
 Platform : { "platform": "win32", "mode": "windows-com", … }
@@ -41,7 +41,7 @@ InDesign : Adobe InDesign | 21.5.1.73
 Result   : reachable
 ```
 
-Meldet der Smoke-Test *not reachable*, zuerst die registrierte ProgID prüfen:
+Meldet er *not reachable*, zuerst die registrierte ProgID prüfen:
 
 ```powershell
 Get-ChildItem 'HKLM:\SOFTWARE\Classes' |
@@ -49,12 +49,9 @@ Get-ChildItem 'HKLM:\SOFTWARE\Classes' |
 ```
 
 Fehlt die passende in `WIN_PROGIDS` in
-[lib/indesign-driver.js](lib/indesign-driver.js), dort ergänzen. Der Treiber
-probiert versionierte Kennungen zuerst und fällt auf die generische zurück.
+[lib/indesign-driver.js](lib/indesign-driver.js), dort ergänzen.
 
 ## Einbinden in Claude Desktop
-
-In `claude_desktop_config.json`:
 
 ```json
 {
@@ -76,382 +73,203 @@ unter macOS. Eng halten: ein Arbeitsordner, nicht das Home-Verzeichnis.
 
 `INDESIGN_ALLOW_ARBITRARY_CODE` **nicht** setzen. Die Variable schaltet ein
 Werkzeug frei, das beliebiges ExtendScript ausführt, und umgeht damit jede
-unten beschriebene Prüfung.
+hier beschriebene Prüfung.
 
 ---
 
-## Betriebshinweise
+## Was er kann
 
-ExtendScript ist eine mächtige Laufzeit. Alles, was über diesen Server
-erreichbar ist, kann Dokumente anlegen, öffnen, exportieren und löschen. Genau
-dafür ist der Server da — also bewusst betreiben:
+### Das Dokument sehen — 18 Werkzeuge
 
-- Starten, wenn InDesign absichtlich offen ist, nicht dauerhaft im Autostart.
-- `INDESIGN_ALLOWED_DIRS` eng halten.
-- `INDESIGN_ALLOW_ARBITRARY_CODE` ungesetzt lassen.
+Die wichtigere Hälfte, denn ohne sie ist alles andere Raterei.
 
-Ein Verhalten ist erwähnenswert: Die Werkzeuge arbeiten auf
-`app.activeDocument`. Wer parallel an einem Dokument arbeitet, kann von einem
-Werkzeugaufruf getroffen werden — und `close_document` schließt mit
-`SaveOptions.NO`. Beim Einsatz gegen eine laufende InDesign-Sitzung also
-wissen, welches Dokument vorn liegt.
+`inspect_page` listet jedes Objekt mit Typ, Position, Größe, Ebene und
+Zustand. `check_layout` meldet, was *nicht stimmt*: Text, der über seinen
+Rahmen läuft, Rahmen ohne Grafik und ohne Füllung, Objekte über dem
+Seitenrand, überlappende Objekte samt gemeinsamer Fläche. `get_text_content`
+liest Text auf Dokument-, Seiten-, Rahmen- oder Auswahlebene; `find_text`
+sucht, ohne etwas zu ändern, und meldet jeden Treffer mit Seite, Rahmen und
+Umgebung.
+
+Dazu `inspect_object`, `get_document_info`, `list_text_frames`, `list_layers`,
+`list_styles`, `list_color_swatches`, `list_master_pages`, `list_links`,
+`get_selected_objects`, `analyze_embedded_objects`, `analyze_text_problems`,
+`find_typography_issues`, `list_grep_searches`, `preflight_document`.
+
+### Seiten aufbauen — 21 Werkzeuge
+
+`create_document`, `open_document`, `save_document`, `close_document`,
+`add_page`, `delete_page`, `duplicate_page`, `navigate_to_page`,
+`create_text_frame`, `create_rectangle`, `create_ellipse`, `place_image`,
+`create_table`, `populate_table`, `create_layer`, `set_active_layer`,
+`insert_markdown_text`, `apply_master_page`, `insert_page_number`,
+`thread_text_frames`, `data_merge`.
+
+`place_image` prüft, ob der Import tatsächlich Grafik erzeugt hat, statt in
+jedem Fall Erfolg zu melden — eine fehlerhafte SVG (ein doppeltes `xmlns`
+genügt) hinterlässt sonst still einen leeren Rahmen.
+
+### Bestehendes ändern — 18 Werkzeuge
+
+`move_object`, `resize_object`, `delete_object`, `arrange_object`,
+`fit_frame`, `transform_object`, `transform_content`, `format_object`,
+`apply_effect`, `create_gradient`, `align_objects`, `distribute_objects`,
+`group_objects`, `ungroup_objects`, `set_text_wrap`,
+`set_text_frame_options`, `format_table`, `undo`.
+
+`transform_object` ändert den Rahmen, `transform_content` die Grafik darin —
+so beschneidet man von Hand. `apply_effect` deckt alle neun Effekte und die
+sechzehn Füllmethoden ab.
+
+### Text und Formate — 16 Werkzeuge
+
+`edit_text_frame`, `format_text`, `format_paragraph`, `find_replace_text`,
+`clean_imported_text`, `fix_typography_in_selection`, die Werkzeuge für
+Absatz-, Zeichen- und Objektformate sowie `create_color_swatch` und
+`apply_color`.
+
+`format_text` und `format_paragraph` ändern gesetzten Text, ohne dass zuvor
+ein Format definiert werden muss.
+
+### Ausgabe — 7 Werkzeuge
+
+`export_pdf`, `export_images`, `export_epub`, `package_document`,
+`update_links`, `view_document`, `zoom_to_page`. Jeder Export prüft, ob
+tatsächlich eine Datei entstanden ist.
+
+### Alles Übrige — 3 Werkzeuge
+
+Ein Werkzeug je Aufgabe kann InDesign nicht abdecken; das DOM hat tausende
+Eigenschaften. `inspect_object`, `set_properties` und `call_method` erreichen
+sie alle.
+
+```json
+{ "target": { "kind": "pageItem", "objectIndex": 2 },
+  "properties": { "nonprinting": true,
+                  "transparencySettings.blendingSettings.knockoutGroup": true } }
+```
+
+`inspect_object` ohne Eigenschaftsliste zählt alles Lesbare auf — so lässt
+sich ohne Dokumentation herausfinden, was ein Objekt bietet. Werte sind
+Zahlen, Zeichenketten, Wahrheitswerte und Listen, dazu
+`{ enum: "Justification.CENTER_ALIGN" }`, `{ swatch: "Black" }` und
+`{ measure: 20, unit: "mm" }`. Jede Zuweisung ist einzeln abgesichert, eine
+Eigenschaft, die diese InDesign-Version nicht kennt, reißt die anderen also
+nicht mit.
+
+**Das ist nicht `execute_indesign_code` auf Umwegen.** Diese Werkzeuge
+übergeben Daten, nie Anweisungen: Eigenschaftspfade werden Segment für
+Segment gegen `^[A-Za-z][A-Za-z0-9_]*$` geprüft, in einen Namen passt also
+kein Aufruf, kein Operator, keine Klammer; Enum-Verweise müssen exakt
+`Name.MITGLIED` lauten; Werte laufen durch dasselbe Escaping wie überall;
+Methoden stammen aus einer festen Liste ohne `doScript`, `quit` und `eval`.
+31 Tests prüfen genau diese Grenze.
 
 ---
 
-## Unterschiede zum Ausgangsprojekt
+## Beim Arbeiten beachten
 
-### Plattform
+Drei Dinge, die sonst einen Nachmittag kosten.
 
-| | Ausgangsprojekt | hier |
-|---|---|---|
-| Ausführung | `osascript` + `tell application "Adobe InDesign 2026"` | Windows: PowerShell + COM `DoScript`. macOS: unverändert |
-| Temp-Dateien | feste Namen im Repo-Verzeichnis | prozess-eigener Ordner unter `os.tmpdir()`, Zufallsname, Modus 0700, Aufräumen bei Exit/SIGINT/SIGTERM |
-| Argumentübergabe | über Datei | über Datei, auf beiden Plattformen. Kein Argument geht je über die Kommandozeile |
+### Indizes verschieben sich, und sie laufen von vorn nach hinten
 
-Rückgabewerte laufen auf beiden Plattformen über eine Ergebnisdatei, die das
-ExtendScript selbst schreibt.
+`page.allPageItems` und `page.textFrames` sind **von vorn nach hinten**
+sortiert: Index 0 ist das zuletzt erstellte Objekt, nicht das erste.
+Verifiziert gegen InDesign 21.5. Zusätzlich verschieben sich Indizes, sobald
+Objekte hinzukommen, gelöscht, gruppiert oder umsortiert werden — danach
+`inspect_page` erneut lesen, statt einen Index wiederzuverwenden.
 
-### Umgang mit Argumenten
+Beim Verketten besser `readingOrder: true` als eine Indexliste. Wegen der
+umgekehrten Reihenfolge läuft der Text sonst *rückwärts die Seite hinauf*.
 
-Jedes Werkzeug-Argument wird typisiert und geprüft, bevor es Teil eines
-ExtendScript-Quelltextes wird — 366 Einsetzstellen über die fünfzig
-Skript-Vorlagen. Die Helfer liegen in [lib/jsx-safe.js](lib/jsx-safe.js):
-
-| Helfer | für |
-|---|---|
-| `str` | Texte, Namen, Stilbezeichner |
-| `num`, `index` | Größen, Zähler, Seiten- und Rahmenindizes |
-| `measure` | Längen mit Einheit, z. B. `geometricBounds` |
-| `bool` | Schalter |
-| `enumOf` | InDesign-Enums, gegen eine Positivliste |
-| `jsxPath`, `validateFilePath` | Dateipfade, begrenzt auf erlaubte Verzeichnisse |
-| `json`, `numList` | Tabellendaten und Farbwerte |
-
-Werte, die sich nicht abbilden lassen, werden mit einem Fehler abgewiesen
-statt durchgereicht. Die Pfadprüfung ist plattformbewusst: eine
-POSIX-Sperrliste (`/etc`, `/System`, `/bin`) trifft unter Windows nichts.
-
-### Nebenbei behoben
-
-Drei Fehler in den Skript-Vorlagen, unabhängig von der Plattform:
-
-- **Rückgabewerte.** Skripte liefern ihr Ergebnis als abschließenden Ausdruck,
-  den der Executor einer Ergebnisvariablen zuweist. Diese Zuweisung geschah
-  zeilenweise — ein über mehrere Zeilen laufender Schlussausdruck bekam das
-  Präfix mitten hinein, ein Syntaxfehler. Betroffen war `create_document`.
-- **`fix_typography_in_selection`** enthielt ein Literal aus drei
-  Anführungszeichen, kein gültiges JavaScript. Das Skript ließ sich nicht
-  parsen, sobald `fixQuotes` gesetzt war.
-- **`insert_markdown_text`** schrieb ein Template-Literal ins ExtendScript.
-  ExtendScript ist ES3 und kennt keine Template-Literale.
-
----
-
-
----
-
-## Arbeiten, ohne die Seite zu sehen
-
-Die Werkzeuge melden, was sie getan haben, nicht wie das Dokument danach
-aussieht. Aus dieser Lücke entstehen falsche Layouts: Ein Bildimport, der
-still nichts erzeugt hat, meldet trotzdem „platziert"; ein Textrahmen, der
-seinen Inhalt nicht fassen kann, meldet „angelegt"; dass zwei Rahmen
-übereinanderliegen, erwähnt niemand.
-
-Drei Werkzeuge schließen sie.
-
-**`inspect_page`** listet jedes Objekt mit Typ, Position, Größe, Ebene und
-Zustand, von vorn nach hinten. Der ausgegebene Index ist der `objectIndex`,
-den die Bearbeitungswerkzeuge erwarten. Indizes verschieben sich, sobald
-Objekte hinzukommen, gelöscht oder umsortiert werden — danach also erneut
-lesen.
-
-**`check_layout`** meldet, was nicht stimmt:
-
-| Befund | bedeutet |
-|---|---|
-| `OVERSET TEXT` | der Rahmen kann seinen Inhalt nicht vollständig zeigen |
-| `EMPTY FRAME` | keine Grafik und keine Füllung — ein Import kann fehlgeschlagen sein |
-| `OFF PAGE` | das Objekt ragt über den Seitenrand hinaus |
-| `OVERLAP` | zwei Objekte überschneiden sich, mit Fläche und Angabe, welches vorn liegt |
-
-Nach dem Aufbau einer Seite und vor dem Export laufen lassen.
-
-**`place_image`** prüft jetzt, ob der Import tatsächlich Grafik erzeugt hat.
-Eine fehlerhafte SVG — ein doppeltes `xmlns`-Attribut genügt — hinterlässt in
-InDesign einen leeren Rahmen, ohne dass etwas gemeldet wird. Das Werkzeug
-entfernt diesen Rahmen und gibt einen Fehler mit Dateinamen zurück, statt
-Erfolg zu melden. Im Erfolgsfall liefert es Rahmen- und Grafikmaße und warnt,
-wenn die Grafik beschnitten ist.
-
-## Objekte bewegen
-
-`move_object`, `resize_object`, `delete_object`, `arrange_object` und
-`fit_frame` arbeiten mit dem `objectIndex` aus `inspect_page`. Alle Maße in
-Millimetern, Positionen beziehen sich auf die obere linke Ecke.
-
-`arrange_object` nimmt `BRING_TO_FRONT`, `BRING_FORWARD`, `SEND_BACKWARD` oder
-`SEND_TO_BACK` — zu benutzen, wenn `check_layout` meldet, dass das falsche
-Objekt oben liegt. `fit_frame` wendet eine Einpassung auf bereits Platziertes
-an: `PROPORTIONALLY` passt das ganze Bild in den Rahmen, `FILL_PROPORTIONALLY`
-füllt den Rahmen und beschneidet, `FRAME_TO_CONTENT` vergrößert stattdessen
-den Rahmen.
-
-`delete_object` verlangt `confirmDestructive: true`.
-
-## Punkt und Millimeter
+### Punkt und Millimeter
 
 Geometrie läuft in Millimetern, `fontSize` in Punkt — so rechnet InDesign bei
 Schrift. Ein Millimeterwert erzeugt Text in etwa einem Drittel der gewollten
 Größe, und nichts weist ihn zurück: 10 pt ist eine gültige Größe. Die
-Werkzeugbeschreibungen sagen es deshalb ausdrücklich, und ein Schriftgrad
-unter 4 pt kommt mit einem Hinweis auf die Umrechnung zurück. 1 mm sind rund
-2,83 pt.
+Werkzeugbeschreibungen sagen es, und ein Grad unter 4 pt kommt mit einem
+Hinweis zurück. 1 mm sind rund 2,83 pt.
 
+### Wenn ein Werkzeug ohne erkennbaren Grund scheitert
 
-## Anordnen, Textfluss und mehrseitige Dokumente
-
-`align_objects` und `distribute_objects` nehmen eine Liste von Objektindizes.
-Ausrichten an `ITEM_BOUNDS` braucht zwei Objekte; gegen `PAGE_BOUNDS` oder
-`MARGIN_BOUNDS` genügt eines — so zentriert man etwas auf der Seite. Beim
-Verteilen gleichen `HORIZONTAL_SPACE` und `VERTICAL_SPACE` die Abstände an,
-was eine Reihe von Karten meist braucht; die Kantenoptionen gleichen
-stattdessen den Abstand zwischen diesen Kanten an.
-
-`group_objects` / `ungroup_objects` und `transform_object` (drehen,
-skalieren, spiegeln) vervollständigen das Set. Die Drehung ist absolut in
-Grad, gegen den Uhrzeigersinn.
-
-`thread_text_frames` lässt einen Text von einem Rahmen in den nächsten
-laufen. Besser `readingOrder: true` mit `pageIndex` verwenden als Rahmen per
-Index aufzuzählen, denn **die Indexreihenfolge ist invertiert**:
-`page.textFrames` läuft von vorn nach hinten, der zuletzt erstellte Rahmen ist
-Index 0. Verkettet man nach aufsteigendem Index, läuft der Text rückwärts die
-Seite hinauf. Mit `readingOrder` werden die Rahmen stattdessen von oben nach
-unten und links nach rechts sortiert. In beiden Fällen verweigert das Werkzeug
-die Arbeit, wenn ein späterer Rahmen bereits Text enthält, statt ihn zu
-verwerfen.
-
-`set_text_frame_options` setzt Spalten, Steg, Innenabstand und vertikale
-Ausrichtung. `set_text_wrap` hält Text von einem Objekt frei.
-
-`list_master_pages` und `apply_master_page` behandeln Musterseiten — erst die
-Liste lesen, denn die Standard-Musterseite trägt einen lokalisierten Namen.
-`insert_page_number` setzt eine automatische Marke; nur diese Nummerierung
-übersteht das Umsortieren von Seiten.
-
-`list_links` und `update_links` betreffen platzierte Dateien: Eine fehlende
-oder veraltete Verknüpfung exportiert kommentarlos in Vorschauauflösung — also
-vor dem Export prüfen. `undo` geht durch die Dokumenthistorie zurück, wenn ein
-Aufruf das Falsche getan hat.
-
-### Zu den Indizes
-
-Sowohl `page.allPageItems` als auch `page.textFrames` laufen **von vorn nach
-hinten** — Index 0 ist das zuletzt erstellte Objekt, nicht das erste.
-Verifiziert gegen InDesign 21.5. Zusätzlich verschieben sich Indizes, sobald
-Objekte hinzukommen, gelöscht, gruppiert oder umsortiert werden. Danach
-`inspect_page` erneut lesen, statt einen Index wiederzuverwenden.
-
-
-
-## Bestehendes ändern
-
-Ein Objekt anzulegen und eines nachträglich zu ändern sind verschiedene
-Aufgaben, und nur die erste war abgedeckt. Diese vier schließen die Lücke.
-
-`format_object` setzt Füllung, Tonwert, Kontur, Konturausrichtung, Deckkraft
-und Ecken. Farben sind Farbfeldnamen; ein unbekannter Name listet auf, was das
-Dokument tatsächlich hat, statt das Objekt unverändert zu lassen. `"None"`
-entfernt Füllung oder Kontur.
-
-`apply_shadow` setzt oder entfernt einen Schlagschatten — Versatz und
-Weichzeichnung in mm.
-
-`transform_content` skaliert, verschiebt oder dreht die Grafik **im** Rahmen
-und lässt den Rahmen unangetastet. Das ist die fehlende Hälfte des
-Skalierens: `resize_object` ändert den Rahmen, `fit_frame` passt die Grafik
-ein, und dieses Werkzeug erlaubt manuelles Beschneiden und Verschieben. Es
-meldet danach, ob die Grafik beschnitten ist.
-
-`format_text` ändert Größe, Schrift, Farbe, Ausrichtung, Zeilen- und
-Laufweite an bereits gesetztem Text, ohne einen Stil zu definieren, und warnt,
-wenn der Text dadurch überläuft.
-
-### Zwei Namen, die nicht sind, wonach sie aussehen
-
-Beide gegen InDesign 21.5 verifiziert, beide zuvor falsch in diesem Server:
-
-- **Ein Rechteck hat kein `cornerRadius`.** Jede Ecke trägt ihren eigenen
-  (`topLeftCornerRadius` und Geschwister), jede mit eigener `...CornerOption`.
-  `create_rectangle` benutzte die nicht existierende Eigenschaft — ein
-  übergebener Eckenradius führte zur Laufzeit zum Fehler. `format_object`
-  setzt alle vier.
-- **`Justification` kennt kein `JUSTIFY`.** Die Blocksatz-Werte heißen
-  `LEFT_JUSTIFIED`, `RIGHT_JUSTIFIED`, `CENTER_JUSTIFIED` und
-  `FULLY_JUSTIFIED`. Vier Werkzeug-Schemas boten `JUSTIFY` an, das die
-  Validierung dann zurückwies — das Werkzeug schlug einen Wert vor, den es
-  selbst nicht annahm.
-
-
-
-## Wenn ein Werkzeug ohne erkennbaren Grund scheitert
-
-InDesign ignoriert eine Eigenschaft nicht, die es nicht kennt - es wirft, und
+InDesign ignoriert eine Eigenschaft nicht, die es nicht kennt — es wirft, und
 der gesamte Aufruf bricht ab. Ein Werkzeug, das einen Namen zu viel setzt,
-scheitert vollstaendig; das sieht aus, als taete es nichts, nicht nach einem
-Namensproblem. Mehrere Werkzeuge trugen Namen aus aelteren Versionen und
-scheiterten genau so.
+scheitert vollständig; das sieht aus, als täte es nichts.
 
 ```bash
 npm run verify-api
 ```
 
-prueft jede DOM-Eigenschaft und jedes Enum-Mitglied, das dieser Server
+prüft jede DOM-Eigenschaft und jedes Enum-Mitglied, das dieser Server
 schreibt, gegen die laufende Anwendung und endet mit Fehlercode, wenn etwas
-fehlt. Nach einem InDesign-Update lohnt der Lauf, und als Erstes, wenn ein
-Werkzeug sich ohne klaren Grund merkwuerdig verhaelt.
+fehlt. Nach einem InDesign-Update laufen lassen, und als Erstes, wenn sich
+etwas unerklärlich verhält.
 
-Was er gefunden hat, alles in InDesign 21.5:
+Zwei weitere Ursachen, die man kennen sollte. **Ein modaler Dialog** in
+InDesign blockiert jeden Aufruf, bis er geschlossen ist, und die Meldung kommt
+in der Oberflächensprache — der Treiber sagt das jetzt ausdrücklich. Und
+InDesigns **typografische Anführungszeichen** ersetzen gerade Anführungszeichen
+in gesetztem Text, was zählt, wenn exakte Zeichen gebraucht werden.
 
-| der Server setzte | die Version kennt |
-|---|---|
-| `pdfExportPreferences.includeBleedMarks` | `bleedMarks` |
-| `pdfExportPreferences.includeSlugArea` | `includeSlugWithPDF` |
-| `pdfExportPreferences.outputIntention` | nichts Entsprechendes |
-| `jpeg`/`pngExportPreferences.resolution` | `exportResolution` |
-| `useDocumentBleedWithPDF` bei Bildern | `useDocumentBleeds` |
-| `app.epubExportPreferences` | ersatzlos entfallen |
-| `findTextPreferences.caseSensitive` | `findChangeTextOptions.caseSensitive` |
-| `rectangle.cornerRadius` | `topLeftCornerRadius` und Geschwister |
-| `Justification.JUSTIFY` | `FULLY_JUSTIFIED` und drei weitere |
+---
 
-Preflight hatte dasselbe Problem in anderer Form: Die Prozess-Sammlung liegt
-auf `app` und nimmt das Dokument als Argument, die Ergebnisse stehen in
-`aggregatedResults` statt in `preflightResultsData`, und der Prozess laeuft
-asynchron - ohne `waitForProcess()` werden die Ergebnisse gelesen, bevor er
-fertig ist.
+## Unterschiede zum Ausgangsprojekt
 
+| | Ausgangsprojekt | hier |
+|---|---|---|
+| Plattform | nur macOS, über `osascript` | Windows über PowerShell + COM; macOS unverändert |
+| Temp-Dateien | feste Namen im Repo-Verzeichnis | prozess-eigener Ordner unter `os.tmpdir()`, Modus 0700, Aufräumen bei Exit |
+| Argumente | roh in Quelltext eingesetzt | typisiert und geprüft an 366 Einsetzstellen |
+| Rückmeldung | meldet, was getan wurde | meldet, wie das Dokument aussieht |
+| Tests | keine | 265 |
 
+Die Argumentprüfung liegt in [lib/jsx-safe.js](lib/jsx-safe.js): `str`, `num`,
+`index`, `measure`, `bool`, `enumOf`, `jsxPath`, `json`, `numList`. Werte, die
+sich nicht abbilden lassen, werden abgewiesen statt durchgereicht.
 
-## Effekte, Verläufe, Tabellen und Absätze
+Mehrere API-Namen hatten sich zwischen InDesign-Versionen verschoben und
+wurden gegen 21.5 korrigiert — `bleedMarks`, `includeSlugWithPDF`,
+`exportResolution`, `useDocumentBleeds`,
+`findChangeTextOptions.caseSensitive`, `topLeftCornerRadius`, die
+`_JUSTIFIED`-Ausrichtungswerte — und `app.epubExportPreferences` existiert
+gar nicht mehr. `verify-api` gibt es, damit das nicht noch einmal Werkzeug für
+Werkzeug entdeckt werden muss.
 
-`apply_effect` deckt alle neun Effekte ab - Schlag- und Innenschatten, Schein
-nach außen und innen, Abgeflachte Kante, Satin und die drei Weichzeichner -
-dazu die sechzehn Füllmethoden und die Deckkraft des Objekts selbst. Es
-ersetzt das Werkzeug, das nur Schatten konnte. Nicht jede Option passt zu
-jedem Effekt: Abstand und Winkel sind bei Schatten sinnvoll, Größe bei Schein
-und Weichzeichnung. Optionen, die ein Effekt nicht kennt, werden als ignoriert
-gemeldet, statt den Aufruf scheitern zu lassen.
-
-`create_gradient` erzeugt einen linearen oder radialen Verlauf aus
-vorhandenen Farbfeldern und füllt auf Wunsch ein Objekt damit. Stopps sind
-`{ color, location }`, mindestens zwei.
-
-`format_table` behandelt Zellenfüllung, Rahmen, Innenabstände, vertikale
-Ausrichtung, Spaltenbreiten und Kopfzeilen. `rowRange` begrenzt, welche Zeilen
-die Zelleinstellungen treffen - `header`, `body`, `all` oder ein expliziter
-Bereich. Tabellen liegen in Textabschnitten, nicht auf Seiten, und werden
-deshalb über einen dokumentweiten Index angesprochen.
-
-`format_paragraph` setzt Einzüge, Abstand davor und danach, Silbentrennung und
-Zeilen zusammenhalten. `format_text` behandelt die Zeichenattribute, dies die
-Absatzattribute - beide ohne dass zuvor ein Format definiert werden muss.
-
-
-
-## An alles andere herankommen
-
-Ein Werkzeug je Aufgabe kann InDesign nicht abdecken. Das DOM hat tausende
-Eigenschaften, und die spezialisierten Werkzeuge erreichen die, an die jemand
-gedacht hat. Drei Werkzeuge decken den Rest ab.
-
-`inspect_object` liest jedes Objekt. Ohne `properties` listet es jeden
-lesbaren Namen samt Wert - so lässt sich ohne Dokumentation herausfinden, was
-ein Objekt bietet. Mit `properties` liest es gezielt und sagt, welche davon es
-an diesem Objekt nicht gibt.
-
-`set_properties` schreibt beliebige Eigenschaften. Werte sind Zahlen, Zeichen-
-ketten, Wahrheitswerte und Listen, dazu drei markierte Formen für das, was
-ein Literal nicht ausdrücken kann: `{ enum: "Justification.CENTER_ALIGN" }`,
-`{ swatch: "Black" }` und `{ measure: 20, unit: "mm" }`. Jede Zuweisung ist
-einzeln abgesichert, ein Name, den diese Version nicht kennt, reißt die
-anderen also nicht mit.
-
-`call_method` ruft eine von 23 freigegebenen Methoden auf.
-
-```json
-{ "target": { "kind": "pageItem", "pageIndex": 0, "objectIndex": 2 },
-  "properties": { "nonprinting": true,
-                  "transparencySettings.blendingSettings.knockoutGroup": true } }
-```
-
-Ziele sind strukturiert, keine Ausdrücke: `document`, `page`, `pageItem`,
-`textFrame`, `story`, `paragraph`, `character`, `table`, `cell`, `row`,
-`column`, `layer`, `swatch`, die drei Formatarten, `masterSpread` und
-`application`.
-
-### Warum das nicht execute_indesign_code ist
-
-Jenes Werkzeug übergibt die gesamte Laufzeit und bleibt deshalb aus. Diese
-drei übergeben Daten, nie Anweisungen:
-
-- **Eigenschaftspfade** werden Segment für Segment gegen
-  `^[A-Za-z][A-Za-z0-9_]*$` geprüft. Ein Pfad kann also keinen Aufruf, keinen
-  Operator und keine Klammer enthalten. `contents; app.quit()` ist kein
-  gültiger Name und wird abgewiesen, bevor überhaupt ein Skript entsteht.
-- **Enum-Verweise** müssen exakt `Name.MITGLIED` sein, zwei Bezeichner.
-- **Werte** laufen durch dasselbe Escaping wie überall sonst. Ein Payload, der
-  als Wert kommt, landet als Text im Dokument - Ende zu Ende geprüft,
-  einschließlich der Tatsache, dass InDesigns typografische Anführungszeichen
-  ihn danach verändern, was das Gegenteil von Ausführen ist.
-- **Methoden** stammen aus einer festen Liste. `doScript`, `quit` und `eval`
-  stehen nicht darauf.
-
-Erreichbar ist damit jede Eigenschaft jedes Objekts - das ist der Zweck - und
-nicht jede Anweisung, was nicht der Zweck ist.
-
+---
 
 ## Tests
 
 ```bash
-npm test
+npm test              # 265 Fälle, ohne InDesign
+npm run lint          # Syntax über alle Module
+npm run verify-api    # DOM-Namen gegen die laufende Anwendung
 ```
 
-75 Fälle, ohne laufendes InDesign:
-
-- **[test/scripts.test.mjs](test/scripts.test.mjs)** — erzeugt jede der
-  fünfzig Werkzeug-Methoden parsebaren ExtendScript-Quelltext?
-  `node --check index.js` prüft nur den Server, nie den generierten
-  Skripttext; eine kaputte Vorlage fiele sonst erst in InDesign auf. Dazu eine
-  ES3-Sperrliste, weil Node mehr akzeptiert als ExtendScript.
-- **[test/injection.test.mjs](test/injection.test.mjs)** —
-  Ausbruchs-Payloads je Argumenttyp. Jeder muss abgewiesen werden oder als
-  maskiertes Literal enden. Enthält eine Gegenprobe gegen bewusst
-  unzureichendes Escaping, damit ein grüner Lauf ein Beleg ist und nicht bloß
-  die Abwesenheit eines Befunds.
-
-Der Harness ([test/harness.mjs](test/harness.mjs)) tauscht den
-Plattformtreiber gegen einen Collector und arbeitet auf einer Kopie von
-`index.js` in einem Temp-Verzeichnis. `index.js` selbst bleibt unberührt.
+Die Suite ersetzt den Plattformtreiber, läuft also in der CI unter Linux und
+Windows ohne InDesign. Sie prüft, dass jedes Werkzeug parsebaren
+ExtendScript-Quelltext erzeugt — `node --check index.js` prüft den Server,
+nie das erzeugte Skript — und dass Ausbruchs-Payloads abgewiesen oder auf
+maskierte Literale reduziert werden. Enthalten ist eine Gegenprobe gegen
+bewusst unzureichendes Escaping, damit ein grüner Lauf ein Beleg ist und
+nicht bloß die Abwesenheit eines Befunds.
 
 ### Gegen ein laufendes InDesign
 
 ```bash
-npm run smoke          # nur lesend: Name und Version
-npm run e2e            # Dokument -> Text -> PDF -> Text prüfen -> schließen
+npm run smoke          # nur lesend
+npm run e2e            # Dokument -> Text -> PDF -> prüfen -> schließen
+npm run e2e-layout     # Inspektion und Objektbearbeitung
+npm run e2e-arrange    # Ausrichten, Verketten, Musterseiten
+npm run e2e-style      # Transformationen und Gestaltung
+npm run e2e-effect     # Effekte, Verläufe, Tabellen, Absätze
+npm run e2e-export     # Exporte und Preflight
+npm run e2e-generic    # generischer Zugriff samt seiner Grenze
 ```
 
-[scripts/e2e.mjs](scripts/e2e.mjs) vermeidet bewusst das Werkzeug
-`close_document`. Es versieht das angelegte Dokument mit einem Label und
-schließt nur, was dieses Label trägt; die Dokumentenzahl wird vorher und
-nachher verglichen. Ein parallel geöffnetes Dokument kann so nicht getroffen
-werden.
-
-Den Textnachweis im PDF übernimmt `pypdf`, falls installiert. InDesign bettet
-Schrift-Subsets ein — die Zeichencodes im Content-Stream sind nicht ASCII, der
-Klartext steht dort auch nach dem Entpacken nicht. Ohne `pypdf` prüft das
-Skript nur die PDF-Struktur und sagt das auch.
+Jeder markiert das Dokument, das er anlegt, und schließt nur dieses; die
+Dokumentenzahl wird vorher und nachher verglichen — ein parallel geöffnetes
+Dokument kann nicht getroffen werden. Werte werden aus dem Dokument
+zurückgelesen, statt der Rückmeldung zu vertrauen.
 
 ---
 
@@ -459,10 +277,14 @@ Skript nur die PDF-Struktur und sagt das auch.
 
 - Windows ist auf Windows 11 mit InDesign 21.5 verifiziert. Andere Versionen
   sollten über die generische ProgID funktionieren, sind aber ungeprüft.
-- macOS-Unterstützung stammt unverändert aus dem Ausgangsprojekt und ist vom
-  Ende-zu-Ende-Test hier nicht abgedeckt.
-- Die Werkzeuge arbeiten auf dem aktiven Dokument. Eine Dokumentauswahl gibt
+- macOS-Unterstützung stammt unverändert aus dem Ausgangsprojekt und ist von
+  den Ende-zu-Ende-Tests hier nicht abgedeckt.
+- Die Werkzeuge arbeiten auf dem aktiven Dokument; eine Dokumentauswahl gibt
   es nicht.
+- Nicht als eigene Werkzeuge, über `set_properties` aber erreichbar:
+  interaktive Funktionen (Hyperlinks, Schaltflächen), Artikel,
+  Inhaltsverzeichnis, Index, Buch, Pathfinder, Hilfslinien und der
+  Ink Manager.
 - Das Ausgangsprojekt kennt diese Änderungen nicht. Nach jedem Merge von dort
   erneut prüfen.
 

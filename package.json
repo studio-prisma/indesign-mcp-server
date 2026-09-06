@@ -1,7 +1,7 @@
 {
   "name": "indesign-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for Adobe InDesign automation. Windows and macOS, with validated tool arguments and a test suite.",
+  "version": "2.0.0",
+  "description": "MCP server for Adobe InDesign. Windows and macOS, 83 tools, validated arguments, and generic access to the rest of the DOM.",
   "main": "index.js",
   "type": "module",
   "scripts": {
