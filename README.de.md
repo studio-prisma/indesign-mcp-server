@@ -208,6 +208,52 @@ Werkzeugbeschreibungen sagen es deshalb ausdrücklich, und ein Schriftgrad
 unter 4 pt kommt mit einem Hinweis auf die Umrechnung zurück. 1 mm sind rund
 2,83 pt.
 
+
+## Anordnen, Textfluss und mehrseitige Dokumente
+
+`align_objects` und `distribute_objects` nehmen eine Liste von Objektindizes.
+Ausrichten an `ITEM_BOUNDS` braucht zwei Objekte; gegen `PAGE_BOUNDS` oder
+`MARGIN_BOUNDS` genügt eines — so zentriert man etwas auf der Seite. Beim
+Verteilen gleichen `HORIZONTAL_SPACE` und `VERTICAL_SPACE` die Abstände an,
+was eine Reihe von Karten meist braucht; die Kantenoptionen gleichen
+stattdessen den Abstand zwischen diesen Kanten an.
+
+`group_objects` / `ungroup_objects` und `transform_object` (drehen,
+skalieren, spiegeln) vervollständigen das Set. Die Drehung ist absolut in
+Grad, gegen den Uhrzeigersinn.
+
+`thread_text_frames` lässt einen Text von einem Rahmen in den nächsten
+laufen. Besser `readingOrder: true` mit `pageIndex` verwenden als Rahmen per
+Index aufzuzählen, denn **die Indexreihenfolge ist invertiert**:
+`page.textFrames` läuft von vorn nach hinten, der zuletzt erstellte Rahmen ist
+Index 0. Verkettet man nach aufsteigendem Index, läuft der Text rückwärts die
+Seite hinauf. Mit `readingOrder` werden die Rahmen stattdessen von oben nach
+unten und links nach rechts sortiert. In beiden Fällen verweigert das Werkzeug
+die Arbeit, wenn ein späterer Rahmen bereits Text enthält, statt ihn zu
+verwerfen.
+
+`set_text_frame_options` setzt Spalten, Steg, Innenabstand und vertikale
+Ausrichtung. `set_text_wrap` hält Text von einem Objekt frei.
+
+`list_master_pages` und `apply_master_page` behandeln Musterseiten — erst die
+Liste lesen, denn die Standard-Musterseite trägt einen lokalisierten Namen.
+`insert_page_number` setzt eine automatische Marke; nur diese Nummerierung
+übersteht das Umsortieren von Seiten.
+
+`list_links` und `update_links` betreffen platzierte Dateien: Eine fehlende
+oder veraltete Verknüpfung exportiert kommentarlos in Vorschauauflösung — also
+vor dem Export prüfen. `undo` geht durch die Dokumenthistorie zurück, wenn ein
+Aufruf das Falsche getan hat.
+
+### Zu den Indizes
+
+Sowohl `page.allPageItems` als auch `page.textFrames` laufen **von vorn nach
+hinten** — Index 0 ist das zuletzt erstellte Objekt, nicht das erste.
+Verifiziert gegen InDesign 21.5. Zusätzlich verschieben sich Indizes, sobald
+Objekte hinzukommen, gelöscht, gruppiert oder umsortiert werden. Danach
+`inspect_page` erneut lesen, statt einen Index wiederzuverwenden.
+
+
 ## Tests
 
 ```bash

@@ -30,6 +30,10 @@ import {
 // Inspecting and manipulating page items. Separate module because these
 // build larger scripts than the one-liners inline below.
 import * as layout from './lib/layout-tools.js';
+// Aligning, distributing, grouping, transforming.
+import * as arrange from './lib/arrange-tools.js';
+// Text flow, frame setup, master pages, links, undo.
+import * as flow from './lib/flow-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -982,6 +986,278 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             required: ['objectIndex'],
           },
         },
+        {
+          name: 'align_objects',
+          description:
+            'Align objects to each other, to the page, to the margins or to the ' +
+            'spread. Aligning to ITEM_BOUNDS needs at least two objects; against ' +
+            'PAGE_BOUNDS or MARGIN_BOUNDS a single object works, which is how you ' +
+            'centre something on the page. Indices come from inspect_page.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndices: {
+                type: 'array', items: { type: 'number' },
+                description: 'Object indices from inspect_page',
+              },
+              alignment: {
+                type: 'string',
+                enum: ['LEFT_EDGES', 'RIGHT_EDGES', 'TOP_EDGES', 'BOTTOM_EDGES',
+                       'HORIZONTAL_CENTERS', 'VERTICAL_CENTERS'],
+              },
+              relativeTo: {
+                type: 'string',
+                enum: ['ITEM_BOUNDS', 'PAGE_BOUNDS', 'MARGIN_BOUNDS',
+                       'SPREAD_BOUNDS', 'BLEED_BOUNDS', 'KEY_OBJECT'],
+                default: 'ITEM_BOUNDS',
+              },
+            },
+            required: ['objectIndices', 'alignment'],
+          },
+        },
+        {
+          name: 'distribute_objects',
+          description:
+            'Space objects evenly. HORIZONTAL_SPACE and VERTICAL_SPACE equalise the ' +
+            'gaps between objects, which is usually what a row of cards needs; the ' +
+            'edge options equalise the distance between those edges instead. Needs ' +
+            'at least three objects when distributing across ITEM_BOUNDS. Pass ' +
+            'spacing to force a fixed gap in mm.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndices: {
+                type: 'array', items: { type: 'number' },
+                description: 'Object indices from inspect_page',
+              },
+              distribution: {
+                type: 'string',
+                enum: ['LEFT_EDGES', 'RIGHT_EDGES', 'TOP_EDGES', 'BOTTOM_EDGES',
+                       'HORIZONTAL_CENTERS', 'VERTICAL_CENTERS',
+                       'HORIZONTAL_SPACE', 'VERTICAL_SPACE'],
+              },
+              relativeTo: {
+                type: 'string',
+                enum: ['ITEM_BOUNDS', 'PAGE_BOUNDS', 'MARGIN_BOUNDS',
+                       'SPREAD_BOUNDS', 'BLEED_BOUNDS', 'KEY_OBJECT'],
+                default: 'ITEM_BOUNDS',
+              },
+              spacing: { type: 'number', description: 'Fixed gap in mm; omit to spread evenly' },
+            },
+            required: ['objectIndices', 'distribution'],
+          },
+        },
+        {
+          name: 'group_objects',
+          description:
+            'Group objects into a single item, so they move and align together. ' +
+            'The group replaces its members on the page - run inspect_page ' +
+            'afterwards for the new indices.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndices: {
+                type: 'array', items: { type: 'number' },
+                description: 'At least two object indices from inspect_page',
+              },
+              name: { type: 'string', description: 'Optional name for the group' },
+            },
+            required: ['objectIndices'],
+          },
+        },
+        {
+          name: 'ungroup_objects',
+          description: 'Break a group back into its members. Indices shift afterwards.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+            },
+            required: ['objectIndex'],
+          },
+        },
+        {
+          name: 'transform_object',
+          description:
+            'Rotate, scale or flip an object. Rotation is absolute in degrees, ' +
+            'counter-clockwise - passing 45 sets the angle to 45, it does not add ' +
+            '45 to the current one. Scale values are percentages.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              rotation: { type: 'number', description: 'Absolute angle in degrees, counter-clockwise' },
+              scaleX: { type: 'number', description: 'Horizontal scale in percent' },
+              scaleY: { type: 'number', description: 'Vertical scale in percent' },
+              flipHorizontal: { type: 'boolean' },
+              flipVertical: { type: 'boolean' },
+            },
+            required: ['objectIndex'],
+          },
+        },
+        {
+          name: 'thread_text_frames',
+          description:
+            'Thread text frames so a story runs from one into the next - the basis ' +
+            'for body copy across columns or pages. ' +
+            'Simplest use: pass pageIndex and readingOrder: true, which threads ' +
+            'every frame on the page top to bottom and left to right. ' +
+            'Prefer that, because the index order is a trap - page.textFrames is ' +
+            'ordered front to back, so the LAST frame created is index 0 and ' +
+            'threading by ascending index runs the story backwards up the page. ' +
+            'Alternatively list frames explicitly in flow order; frameIndex then ' +
+            'uses the list_text_frames numbering, not the inspect_page one. ' +
+            'Refuses if a later frame already holds text, since threading would ' +
+            'discard it.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              readingOrder: {
+                type: 'boolean',
+                description: 'Thread every frame on the page by position instead of listing them',
+                default: false,
+              },
+              frames: {
+                type: 'array',
+                description: 'Frames in flow order; omit when readingOrder is true',
+                items: {
+                  type: 'object',
+                  properties: {
+                    pageIndex: { type: 'number', default: 0 },
+                    frameIndex: { type: 'number', description: 'Index from list_text_frames' },
+                  },
+                  required: ['frameIndex'],
+                },
+              },
+            },
+          },
+        },
+        {
+          name: 'set_text_frame_options',
+          description:
+            'Columns, gutter, inset and vertical alignment inside a text frame. ' +
+            'Measurements in mm. frameIndex is the numbering from list_text_frames.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              frameIndex: { type: 'number', description: 'Index from list_text_frames' },
+              columns: { type: 'number', description: 'Number of columns' },
+              columnGutter: { type: 'number', description: 'Gap between columns in mm' },
+              inset: { type: 'number', description: 'Inset on all four sides in mm' },
+              verticalJustification: {
+                type: 'string',
+                enum: ['TOP_ALIGN', 'CENTER_ALIGN', 'BOTTOM_ALIGN', 'JUSTIFY_ALIGN'],
+              },
+              autoSize: { type: 'boolean', description: 'Grow the frame height to fit its text' },
+            },
+            required: ['frameIndex'],
+          },
+        },
+        {
+          name: 'set_text_wrap',
+          description:
+            'Make text keep clear of an object. BOUNDING_BOX_TEXT_WRAP is the usual ' +
+            'choice; CONTOUR follows the artwork outline. Offset in mm.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              mode: {
+                type: 'string',
+                enum: ['NONE', 'BOUNDING_BOX_TEXT_WRAP', 'CONTOUR',
+                       'JUMP_OBJECT_TEXT_WRAP', 'NEXT_COLUMN_TEXT_WRAP'],
+              },
+              offset: { type: 'number', description: 'Clearance in mm', default: 0 },
+            },
+            required: ['objectIndex', 'mode'],
+          },
+        },
+        {
+          name: 'list_master_pages',
+          description:
+            'Master spreads in the document and which master each page uses. ' +
+            'Read this before apply_master_page - the default master is usually ' +
+            'named with a localised suffix, so guessing the name fails.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'apply_master_page',
+          description:
+            'Apply a master spread to a page, or pass an empty masterName to detach ' +
+            'it. Master items appear on the page but are not editable there until ' +
+            'overridden. Use list_master_pages for the available names.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              masterName: {
+                type: 'string',
+                description: 'Name from list_master_pages; empty string detaches the master',
+              },
+            },
+            required: ['masterName'],
+          },
+        },
+        {
+          name: 'insert_page_number',
+          description:
+            'Insert an automatic page-number marker at the end of a text frame. ' +
+            'Placed on a master page it resolves to each page number; on a document ' +
+            'page it shows that page. This is the correct way to number pages - ' +
+            'typing numbers into frames does not survive reordering.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              frameIndex: { type: 'number', description: 'Text frame index on that page or master' },
+              onMaster: { type: 'boolean', description: 'Place it on a master page', default: false },
+              masterName: { type: 'string', description: 'Which master, when onMaster is true' },
+              prefix: { type: 'string', description: 'Text before the number, e.g. "Page "', default: '' },
+            },
+            required: ['frameIndex'],
+          },
+        },
+        {
+          name: 'list_links',
+          description:
+            'Placed files and their state. A missing or out-of-date link exports at ' +
+            'preview resolution without any error, so check this before exporting.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'update_links',
+          description:
+            'Refresh out-of-date links. Missing files cannot be updated automatically ' +
+            'and are reported by name.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              onlyOutOfDate: { type: 'boolean', default: true },
+            },
+          },
+        },
+        {
+          name: 'undo',
+          description:
+            'Step back through the document history - a recovery path when a call ' +
+            'did the wrong thing. It undoes whatever is on the stack, including ' +
+            'steps taken by a person in the interface, so it is not a transaction ' +
+            'rollback. Prefer fixing forward when the change is easy to reverse.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              steps: { type: 'number', description: 'How many steps to undo', default: 1 },
+            },
+          },
+        },
       ],
     }));
 
@@ -1029,6 +1305,24 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             case 'delete_object': return await this.deleteObject(args);
             case 'arrange_object': return await this.arrangeObject(args);
             case 'fit_frame': return await this.fitFrame(args);
+
+            // Arranging and transforming
+            case 'align_objects': return await this.alignObjects(args);
+            case 'distribute_objects': return await this.distributeObjects(args);
+            case 'group_objects': return await this.groupObjects(args);
+            case 'ungroup_objects': return await this.ungroupObjects(args);
+            case 'transform_object': return await this.transformObject(args);
+
+            // Text flow, masters, links, undo
+            case 'thread_text_frames': return await this.threadTextFrames(args);
+            case 'set_text_frame_options': return await this.setTextFrameOptions(args);
+            case 'set_text_wrap': return await this.setTextWrap(args);
+            case 'list_master_pages': return await this.listMasterPages();
+            case 'apply_master_page': return await this.applyMasterPage(args);
+            case 'insert_page_number': return await this.insertPageNumber(args);
+            case 'list_links': return await this.listLinks();
+            case 'update_links': return await this.updateLinks(args);
+            case 'undo': return await this.undoSteps(args);
           case 'create_rectangle': return await this.createRectangle(args);
           case 'create_ellipse': return await this.createEllipse(args);
 
@@ -2893,6 +3187,78 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   // =================== GRAPHICS MANAGEMENT ===================
+  // =================== ARRANGE, FLOW, MASTERS ===================
+
+  async alignObjects(args) {
+    const result = await executeInDesignScript(arrange.alignObjects(args));
+    return this.formatResponse(result, "Align Objects");
+  }
+
+  async distributeObjects(args) {
+    const result = await executeInDesignScript(arrange.distributeObjects(args));
+    return this.formatResponse(result, "Distribute Objects");
+  }
+
+  async groupObjects(args) {
+    const result = await executeInDesignScript(arrange.groupObjects(args));
+    return this.formatResponse(result, "Group Objects");
+  }
+
+  async ungroupObjects(args) {
+    const result = await executeInDesignScript(arrange.ungroupObjects(args));
+    return this.formatResponse(result, "Ungroup Objects");
+  }
+
+  async transformObject(args) {
+    const result = await executeInDesignScript(arrange.transformObject(args));
+    return this.formatResponse(result, "Transform Object");
+  }
+
+  async threadTextFrames(args) {
+    const result = await executeInDesignScript(flow.threadTextFrames(args));
+    return this.formatResponse(result, "Thread Text Frames");
+  }
+
+  async setTextFrameOptions(args) {
+    const result = await executeInDesignScript(flow.setTextFrameOptions(args));
+    return this.formatResponse(result, "Text Frame Options");
+  }
+
+  async setTextWrap(args) {
+    const result = await executeInDesignScript(flow.setTextWrap(args));
+    return this.formatResponse(result, "Text Wrap");
+  }
+
+  async listMasterPages() {
+    const result = await executeInDesignScript(flow.listMasterPages());
+    return this.formatResponse(result, "Master Pages");
+  }
+
+  async applyMasterPage(args) {
+    const result = await executeInDesignScript(flow.applyMasterPage(args));
+    return this.formatResponse(result, "Apply Master Page");
+  }
+
+  async insertPageNumber(args) {
+    const result = await executeInDesignScript(flow.insertPageNumber(args));
+    return this.formatResponse(result, "Insert Page Number");
+  }
+
+  async listLinks() {
+    const result = await executeInDesignScript(flow.listLinks());
+    return this.formatResponse(result, "Links");
+  }
+
+  async updateLinks(args = {}) {
+    const result = await executeInDesignScript(flow.updateLinks(args));
+    return this.formatResponse(result, "Update Links");
+  }
+
+  async undoSteps(args = {}) {
+    const result = await executeInDesignScript(flow.undoSteps(args));
+    return this.formatResponse(result, "Undo");
+  }
+
   // =================== LAYOUT INSPECTION & OBJECTS ===================
 
   async inspectPage(args = {}) {

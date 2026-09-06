@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `align_objects`, `distribute_objects`, `group_objects`, `ungroup_objects`,
+  `transform_object` - arranging and transforming, none of which the server
+  could do.
+- `thread_text_frames` - run a story across frames and pages. Takes
+  `readingOrder: true` to thread by position, because the index order is
+  inverted and threading by ascending index runs the story backwards up the
+  page.
+- `set_text_frame_options` (columns, gutter, inset, vertical alignment) and
+  `set_text_wrap`.
+- `list_master_pages`, `apply_master_page`, `insert_page_number` - the basis
+  for multi-page documents.
+- `list_links`, `update_links` - a missing link exports at preview resolution
+  without raising anything.
+- `undo` - a recovery path when a call did the wrong thing.
 - `inspect_page` - every object on a page with type, position, size, layer and
   state, front to back. The index it prints addresses the object in the tools
   below.

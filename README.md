@@ -202,6 +202,49 @@ third of the intended size, and nothing rejects it — 10 pt is a perfectly
 valid size. The tool descriptions say so explicitly, and a point size below
 4 pt comes back with a note suggesting the conversion. 1 mm is about 2.83 pt.
 
+
+## Arranging, flow and multi-page documents
+
+`align_objects` and `distribute_objects` take a list of object indices.
+Aligning to `ITEM_BOUNDS` needs two objects; against `PAGE_BOUNDS` or
+`MARGIN_BOUNDS` one is enough, which is how you centre something on the page.
+For distributing, `HORIZONTAL_SPACE` and `VERTICAL_SPACE` equalise the gaps —
+usually what a row of cards wants — while the edge options equalise the
+distance between those edges.
+
+`group_objects` / `ungroup_objects` and `transform_object` (rotate, scale,
+flip) complete the set. Rotation is absolute in degrees, counter-clockwise.
+
+`thread_text_frames` runs a story from one frame into the next. Prefer
+`readingOrder: true` with a `pageIndex` over listing frames by index, because
+**the index order is inverted**: `page.textFrames` is ordered front to back,
+so the last frame created is index 0. Threading by ascending index runs the
+story backwards up the page. With `readingOrder` the frames are sorted top to
+bottom and left to right instead. Either way the tool refuses when a later
+frame already holds text, rather than discarding it.
+
+`set_text_frame_options` sets columns, gutter, inset and vertical alignment.
+`set_text_wrap` keeps text clear of an object.
+
+`list_master_pages` and `apply_master_page` handle masters — read the list
+first, since the default master carries a localised name. `insert_page_number`
+places an automatic marker, which is the only numbering that survives page
+reordering.
+
+`list_links` and `update_links` cover placed files: a missing or out-of-date
+link exports at preview resolution without raising anything, so check before
+exporting. `undo` steps back through the document history when a call did the
+wrong thing.
+
+### A note on indices
+
+Both `page.allPageItems` and `page.textFrames` are ordered **front to back** —
+index 0 is the most recently created object, not the first. Verified against
+InDesign 21.5. Indices also shift whenever objects are added, deleted,
+grouped or restacked. Read `inspect_page` again after any of those rather than
+reusing an index.
+
+
 ## Tests
 
 ```bash
