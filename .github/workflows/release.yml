@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.1). Must already exist.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+          fetch-depth: 0
+
+      # Version gate. The manifest is the single source of the version; if it
+      # disagrees with the tag, the release is wrong and stops here. Replace the
+      # extraction with whatever this project's manifest is.
+      - name: Verify manifest version matches the tag
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VERSION="${TAG#v}"
+          MANIFEST=$(echo "REPLACE_ME")   # e.g. grep -oP "\"version\":\s*\"\K[^\"]+" manifest.json
+          if [ "$MANIFEST" != "$VERSION" ]; then
+            echo "::error::Manifest declares '$MANIFEST' but the tag is '$VERSION'."
+            exit 1
+          fi
+          echo "Version $VERSION confirmed."
+
+      - name: Build install package
+        id: build
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VERSION="${TAG#v}"
+          ./tools/build-zip.sh "$VERSION"
+          echo "asset=dist/indesign-mcp-server-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Extract CHANGELOG section for this version
+        id: changelog
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VERSION="${TAG#v}"
+          # Lines from "## [VERSION]" up to (not including) the next "## [" header.
+          NOTES=$(awk -v v="$VERSION" '
+            $0 ~ "^## \\["v"\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            echo "::warning::No CHANGELOG section found for $TAG — using a fallback note."
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          fi
+          {
+            echo 'notes<<RELEASE_NOTES_EOF'
+            echo "$NOTES"
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          body: ${{ steps.changelog.outputs.notes }}
+          files: ${{ steps.build.outputs.asset }}
+          draft: false
+          prerelease: false

@@ -1,0 +1,47 @@
+name: Compatibility report
+description: Report the plugin working (or breaking) on a version combination not listed yet
+labels: ["compatibility"]
+body:
+  - type: input
+    id: osticket-version
+    attributes:
+      label: osTicket version
+      placeholder: "1.18.6"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.4.2"
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Works — all four protected areas
+        - Works — guest ticket form only
+        - Partially broken
+        - Does not work
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Which areas did you test, and what did you observe?
+    validations:
+      required: true

@@ -1,0 +1,125 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Weekly, Monday 06:00 UTC — catches upstream drift on an unchanged repo.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check
+        run: |
+          node --check index.js
+          node --check lib/indesign-driver.js
+          node --check lib/jsx-safe.js
+          node --check scripts/smoke.mjs
+          node --check scripts/e2e.mjs
+          for f in test/*.mjs; do node --check "$f"; done
+
+      - name: No macOS-only execution left in index.js
+        run: |
+          if grep -qEi "osascript|applescript|tell application" index.js; then
+            echo "::error::index.js still contains macOS-only execution paths"
+            grep -nEi "osascript|applescript|tell application" index.js
+            exit 1
+          fi
+
+  test:
+    name: Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        # The suite mocks the platform driver, so it needs no InDesign and runs
+        # on both hosts. Windows is the platform this fork adds; Linux catches
+        # anything that silently depends on a Windows-only path.
+        os: [ubuntu-latest, windows-latest]
+        # The server itself runs on Node 18; the test runner is only
+        # stable from Node 20, so that is what the suite is checked on.
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+
+  # ---------------------------------------------------------------------------
+  # Do not rename. "Gate" is the single required status check in the branch
+  # ruleset of every studio-prisma repo. Add new jobs to `needs`, nothing else.
+  # `if: always()` is mandatory — without it the job is skipped when a dependency
+  # fails, the required context stays pending, and the pull request hangs instead
+  # of turning red.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    needs: [lint, test, audit, actionlint]
+    if: always()
+    steps:
+      - name: Fail unless every job succeeded
+        if: >-
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled') ||
+          contains(needs.*.result, 'skipped')
+        run: |
+          echo "lint=${{ needs.lint.result }}"
+          echo "test=${{ needs.test.result }}"
+          echo "audit=${{ needs.audit.result }}"
+          echo "actionlint=${{ needs.actionlint.result }}"
+          exit 1

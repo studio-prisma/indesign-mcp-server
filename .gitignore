@@ -1,0 +1,46 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup / temp
+*.bak
+*.tmp
+*.log
+*~
+
+# Build output
+dist/
+*.zip
+
+# Test artefacts
+tests/failcopy/
+tests/www/*.log
+__pycache__/
+*.pyc
+
+# Local-only
+local/
+private/
+.drafts/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm
+*.tgz
+
+# InDesign MCP server
+# Artefacts the upstream executor wrote into the repository directory.
+# The driver no longer creates them, but a stale checkout might have them.
+temp_result.txt
+temp_script.jsx
+*.ps1
+*.scpt

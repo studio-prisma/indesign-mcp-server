@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a capability this plugin does not have yet
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to achieve that the plugin does not support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: |
+        This plugin covers browser-based Turnstile verification for osTicket.
+        Email ticket intake and the JSON API are deliberately out of scope.
+      options:
+        - label: My request stays within that scope
+          required: true

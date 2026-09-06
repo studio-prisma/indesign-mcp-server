@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/studio-prisma/osticket-plugin-turnstile/security/advisories/new
+    about: Please report security issues privately, never as a public issue.
+  - name: osTicket core question
+    url: https://forum.osticket.com/
+    about: Questions about osTicket itself belong in the official osTicket forum.

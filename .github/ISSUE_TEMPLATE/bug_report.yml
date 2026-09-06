@@ -1,0 +1,95 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** paste your Cloudflare secret key, ticket contents, or customer
+        data into this form. Redact hostnames if they are not public.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Enable "Client login"
+        2. Open /login.php in a private window
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: osticket-version
+    attributes:
+      label: osTicket version
+      placeholder: "1.18.4"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.3.33"
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Guest ticket form
+        - Client registration
+        - Client login
+        - Staff login
+        - Plugin configuration
+        - Content-Security-Policy
+        - Other / unclear
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fail-mode
+    attributes:
+      label: Fail mode
+      options:
+        - closed
+        - open
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: PHP error log entries containing "turnstile". Redact IPs if needed.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I tested in a fresh private window (no reused cookie jar)
+          required: true
+        - label: The browser console shows no CSP error for challenges.cloudflare.com
+        - label: I have removed all secrets and customer data from this report
+          required: true
