@@ -6,7 +6,7 @@ Only the latest minor release receives security fixes. Older tags are archived, 
 
 | Version | Supported |
 |---|---|
-| `1.0.x` | yes |
+| `2.2.x` | yes |
 | everything older | no |
 
 ## Reporting a Vulnerability
@@ -32,7 +32,12 @@ Expected response: an acknowledgement within 7 days, an assessment within 30. Th
   being set.
 - A temp file that is readable or writable by another local user, or that
   survives process exit with document content in it.
-- Command injection into the PowerShell or osascript runner.
+- Command injection into the PowerShell or osascript runner, including
+  through the undo label the driver passes to `DoScript`.
+- A property path, enum reference or method name that leaves its allow-list in
+  `set_properties` or `call_method`. Those tools pass data, never statements;
+  anything that turns one into a statement is the same finding as an escaped
+  string literal.
 
 A proof of concept is expected: the generated script text is enough, runtime
 execution is not required.

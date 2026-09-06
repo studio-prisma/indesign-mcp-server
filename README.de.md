@@ -354,9 +354,13 @@ zurückgelesen, statt der Rückmeldung zu vertrauen.
 - Die Werkzeuge arbeiten auf dem aktiven Dokument; eine Dokumentauswahl gibt
   es nicht.
 - Nicht als eigene Werkzeuge, über `set_properties` aber erreichbar:
-  interaktive Funktionen (Hyperlinks, Schaltflächen), Artikel,
-  Inhaltsverzeichnis, Index, Buch, Pathfinder, Hilfslinien und der
-  Ink Manager.
+  interaktive Funktionen (Hyperlinks, Schaltflächen), Artikel, Hilfslinien und
+  der Ink Manager — alles, was Eigenschaft eines bereits vorhandenen Objekts
+  ist.
+- Gar nicht erreichbar: Inhaltsverzeichnis, Index, Querverweise, Buch (.indb),
+  Tabellen- und Zellenformate. Jedes davon braucht einen Methodenaufruf auf
+  einer Sammlung, und Erzeugen steht bewusst nicht in der Erlaubnisliste der
+  generischen Schicht. Dafür braucht es eigene Werkzeuge.
 - Das Ausgangsprojekt kennt diese Änderungen nicht. Nach jedem Merge von dort
   erneut prüfen.
 
