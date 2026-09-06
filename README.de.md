@@ -1,18 +1,46 @@
-# indesign-mcp-server
+# InDesign MCP Server
 
-Ein MCP-Server, der Adobe InDesign aus einem Client wie Claude Desktop
-steuert. Dokumente aufbauen, Text und Bilder setzen, Bestehendes umgestalten
-und umsortieren, das Ergebnis prüfen und exportieren — 83 Werkzeuge, dazu
-generischer Zugriff auf alles, was sie nicht abdecken.
+[![Validate](https://github.com/studio-prisma/indesign-mcp-server/actions/workflows/validate.yml/badge.svg)](https://github.com/studio-prisma/indesign-mcp-server/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
+[![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
+[![Tools 83](https://img.shields.io/badge/tools-83-6236ff.svg)](#was-er-kann)
+[![Tests 265](https://img.shields.io/badge/tests-265-brightgreen.svg)](#tests)
 
-Läuft unter **Windows** (PowerShell + COM) und **macOS** (osascript).
+Adobe InDesign aus Claude Desktop oder einem beliebigen MCP-Client steuern —
+Dokumente aufbauen, Text und Bilder setzen, Bestehendes umgestalten und
+umsortieren, das Ergebnis vor dem Export prüfen. 83 Werkzeuge, jedes Argument
+geprüft, dazu generischer Zugriff auf den Rest des DOM.
 
-English version: [README.md](README.md)
+**Windows** (PowerShell + COM) und **macOS** (osascript).
+
+**[English version →](README.md)**
 
 > Fork von [lucdesign/indesign-mcp-server](https://github.com/lucdesign/indesign-mcp-server),
 > das nur unter macOS läuft. Dieser Fork ergänzt Windows-Unterstützung, prüft
 > jedes Werkzeug-Argument, berichtet, wie das Dokument tatsächlich aussieht,
 > und bringt Tests mit. Siehe [Unterschiede zum Ausgangsprojekt](#unterschiede-zum-ausgangsprojekt).
+
+> Betreut von **studio-prisma**.
+
+---
+
+## Warum es das gibt
+
+Zwei Dinge machen skriptgesteuerte InDesign-Arbeit schwerer, als sie aussieht.
+Beide sind hier adressiert.
+
+**Ein Server kann melden, was er getan hat, aber nicht, wie die Seite
+aussieht.** Ein Bildimport, der still nichts erzeugt hat, meldet trotzdem
+„platziert“; ein Textrahmen, der seinen Inhalt nicht fassen kann, meldet
+„angelegt“. `inspect_page` und `check_layout` schließen diese Lücke, und die
+Werkzeuge berichten den Dokumentzustand statt ihres eigenen Erfolgs.
+
+**Eigenschaftsnamen verschieben sich zwischen InDesign-Versionen,** und ein
+Name, den die aktuelle Version nicht kennt, scheitert nicht leise — er bricht
+den gesamten Aufruf ab, sodass das Werkzeug aus sachfremden Gründen kaputt
+wirkt. `npm run verify-api` prüft jeden Namen, den dieser Server schreibt,
+gegen die laufende Anwendung.
 
 ---
 
@@ -78,6 +106,15 @@ hier beschriebene Prüfung.
 ---
 
 ## Was er kann
+
+| Bereich | Werkzeuge | Wofür |
+|---|:--:|---|
+| **[Das Dokument sehen](#das-dokument-sehen--18-werkzeuge)** | 18 | Was auf der Seite steht, wo, auf welcher Ebene — und was daran nicht stimmt |
+| **[Seiten aufbauen](#seiten-aufbauen--21-werkzeuge)** | 21 | Dokumente, Seiten, Rahmen, Bilder, Tabellen, Ebenen, Verkettung |
+| **[Bestehendes ändern](#bestehendes-ändern--18-werkzeuge)** | 18 | Verschieben, skalieren, umsortieren, ausrichten, gruppieren, transformieren, Effekte |
+| **[Text und Formate](#text-und-formate--16-werkzeuge)** | 16 | Bearbeiten, formatieren, suchen und ersetzen, Formate und Farben |
+| **[Ausgabe](#ausgabe--7-werkzeuge)** | 7 | PDF, Bilder, EPUB, Verpacken, Preflight |
+| **[Alles Übrige](#alles-übrige--3-werkzeuge)** | 3 | Generischer Zugriff auf den Rest des DOM |
 
 ### Das Dokument sehen — 18 Werkzeuge
 
