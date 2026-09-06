@@ -5,7 +5,7 @@
 [![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
 [![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
 [![Tools 83](https://img.shields.io/badge/tools-83-6236ff.svg)](#what-it-can-do)
-[![Tests 265](https://img.shields.io/badge/tests-265-brightgreen.svg)](#tests)
+[![Tests 268](https://img.shields.io/badge/tests-268-brightgreen.svg)](#tests)
 
 Drive Adobe InDesign from Claude Desktop or any MCP client — build documents,
 place text and images, restyle and rearrange what is already there, check the
@@ -251,7 +251,7 @@ characters.
 | Temp files | fixed names in the repository directory | per-process directory under `os.tmpdir()`, mode 0700, cleaned up on exit |
 | Arguments | interpolated into script source | typed and validated at 366 interpolation sites |
 | Feedback | reports what it did | reports what the document looks like |
-| Tests | none | 265 |
+| Tests | none | 268 |
 
 Argument validation lives in [lib/jsx-safe.js](lib/jsx-safe.js): `str`, `num`,
 `index`, `measure`, `bool`, `enumOf`, `jsxPath`, `json`, `numList`. Values that
@@ -269,7 +269,7 @@ that does not have to be found one tool at a time again.
 ## Tests
 
 ```bash
-npm test              # 265 cases, no InDesign required
+npm test              # 268 cases, no InDesign required
 npm run lint          # syntax across all modules
 npm run verify-api    # DOM names against the running application
 ```

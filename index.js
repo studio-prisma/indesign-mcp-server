@@ -45,6 +45,26 @@ import * as fx from './lib/effect-tools.js';
 // Generic property access for everything the specialised tools do not reach.
 import * as generic from './lib/generic-tools.js';
 
+/**
+ * InDesign gives every newly created page item the application's default
+ * stroke - 1 pt black. Nobody asked for it: a caller who wants a stroke names
+ * one. It is invisible on a dark ground, draws a box around the element on a
+ * light one, and shows up in print long after it stopped being noticeable on
+ * screen. Every creation site below resets it unless a stroke was requested.
+ *
+ * The name is always a literal from this file, never caller input, and the
+ * check keeps it that way.
+ */
+function clearDefaultStroke(varName) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) {
+    throw new Error(`clearDefaultStroke: not an identifier: ${varName}`);
+  }
+  return `try {
+              ${varName}.strokeColor = doc.swatches.itemByName("None");
+              ${varName}.strokeWeight = 0;
+            } catch (e) {}`;
+}
+
 class InDesignMCPServer {
   constructor() {
     this.server = new Server(
@@ -3376,6 +3396,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             
             // Create text frame
             var textFrame = page.textFrames.add();
+            ${clearDefaultStroke('textFrame')}
             textFrame.geometricBounds = [${measure(y, { unit: 'mm', name: 'y' })}, ${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y + height, { unit: 'mm', name: 'y' })}, ${measure(x + width, { unit: 'mm', name: 'x' })}];
             
             // Add content
@@ -3716,6 +3737,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
                 "For SVG, check that the XML is well formed - a duplicate " +
                 "xmlns attribute is enough to make the import fail silently.";
             } else {
+              ${clearDefaultStroke('rect')}
               var graphic = rect.allGraphics[0];
               var linkState = "embedded";
               if (graphic.itemLink !== null) {
@@ -3807,7 +3829,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               rect.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
               rect.strokeWeight = ${measure(strokeWidth, { unit: 'pt', name: 'strokeWidth' })};
             } catch (e) {}
-          ` : ''}
+          ` : clearDefaultStroke('rect')}
           
           "Rectangle created on page " + (${index(pageIndex, { name: 'pageIndex' })} + 1) + " (" + ${num(width, { name: 'width' })} + "mm x " + ${num(height, { name: 'height' })} + "mm)";
         } catch (e) {
@@ -3845,7 +3867,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               ellipse.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
               ellipse.strokeWeight = ${measure(strokeWidth, { unit: 'pt', name: 'strokeWidth' })};
             } catch (e) {}
-          ` : ''}
+          ` : clearDefaultStroke('ellipse')}
           
           "Ellipse created on page " + (${index(pageIndex, { name: 'pageIndex' })} + 1) + " (" + ${num(width, { name: 'width' })} + "mm x " + ${num(height, { name: 'height' })} + "mm)";
         } catch (e) {
@@ -4588,6 +4610,7 @@ Usage: INDESIGN_ALLOW_ARBITRARY_CODE=1 node index.js`
         try {
           var page = doc.pages[${index(pageIndex, { name: 'pageIndex' })}];
           var textFrame = page.textFrames.add();
+          ${clearDefaultStroke('textFrame')}
           textFrame.geometricBounds = [${measure(y, { unit: 'mm', name: 'y' })}, ${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y + height, { unit: 'mm', name: 'y' })}, ${measure(x + width, { unit: 'mm', name: 'x' })}];
           
           var table = textFrame.tables.add();

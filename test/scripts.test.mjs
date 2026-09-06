@@ -112,3 +112,58 @@ test('autoCaptureResult leaves scripts that set __result__ alone', () => {
   const src = '__result__ = "fixed";';
   assert.equal(autoCaptureResult(src), src);
 });
+
+// ------------------------------------------------- the default 1 pt stroke
+
+/**
+ * InDesign gives every newly created page item the application's default
+ * stroke, 1 pt black. A caller who wants a stroke names one, so an unrequested
+ * stroke is the server putting something on the page that nobody asked for:
+ * invisible on a dark ground, a box around the element on a light one, and
+ * visible in print long after it stopped being noticeable on screen.
+ */
+const CREATORS = ['createTextFrame', 'createRectangle', 'createEllipse',
+  'createTable', 'placeImage'];
+
+test('a new frame carries no stroke unless one was asked for', async () => {
+  for (const method of CREATORS) {
+    const args = { ...ARGS };
+    delete args.strokeColor;
+
+    const { error, script } = await runTool(method, args);
+    assert.ok(script, `${method} produced no script: ${error && error.message}`);
+    assert.match(
+      script,
+      /strokeColor = doc\.swatches\.itemByName\("None"\)/,
+      `${method} leaves InDesign's default 1 pt stroke on the frame`
+    );
+  }
+});
+
+test('a stroke that was asked for is still applied', async () => {
+  for (const method of ['createRectangle', 'createEllipse']) {
+    const { script } = await runTool(method, { ...ARGS, strokeColor: 'Black' });
+    assert.match(
+      script,
+      /strokeColor = doc\.swatches\.itemByName\("Black"\)/,
+      `${method} ignores the stroke colour it was given`
+    );
+    assert.doesNotMatch(
+      script,
+      /strokeColor = doc\.swatches\.itemByName\("None"\)/,
+      `${method} clears a stroke the caller explicitly asked for`
+    );
+  }
+});
+
+test('the stroke reset cannot take a name from outside this file', async () => {
+  // clearDefaultStroke is module-private; what is testable from here is that
+  // every generated reset names a plain identifier and nothing else.
+  const { script } = await runTool('createRectangle',
+    { ...ARGS, strokeColor: undefined });
+  const resets = script.match(/(\w+)\.strokeColor = doc\.swatches\.itemByName\("None"\)/g) || [];
+  assert.ok(resets.length > 0, 'no reset emitted');
+  for (const r of resets) {
+    assert.match(r, /^[A-Za-z_][A-Za-z0-9_]*\.strokeColor/, `suspicious target: ${r}`);
+  }
+});
