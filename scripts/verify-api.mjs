@@ -62,8 +62,19 @@ const SURFACE = [
   ]],
   ['rect.transparencySettings.blendingSettings', ['opacity']],
   ['rect.transparencySettings.dropShadowSettings', [
-    'mode', 'opacity', 'xOffset', 'yOffset', 'size',
+    'mode', 'opacity', 'xOffset', 'yOffset', 'size', 'distance', 'angle',
   ]],
+  ['rect.transparencySettings.outerGlowSettings', [
+    'applied', 'opacity', 'size', 'effectColor', 'blendMode', 'spread', 'noise',
+  ]],
+  ['rect.transparencySettings.innerShadowSettings', ['applied', 'opacity', 'size']],
+  ['rect.transparencySettings.innerGlowSettings', ['applied', 'opacity', 'size']],
+  ['rect.transparencySettings.bevelAndEmbossSettings', ['applied', 'size']],
+  ['rect.transparencySettings.satinSettings', ['applied', 'opacity', 'size']],
+  ['rect.transparencySettings.featherSettings', ['mode', 'width', 'cornerType', 'noise']],
+  ['rect.transparencySettings.directionalFeatherSettings', ['applied']],
+  ['rect.transparencySettings.gradientFeatherSettings', ['applied']],
+  ['rect.transparencySettings.blendingSettings', ['blendMode', 'knockoutGroup']],
   ['tf', [
     'contents', 'overflows', 'nextTextFrame', 'previousTextFrame',
     'parentStory', 'textWrapPreferences', 'geometricBounds',
@@ -74,7 +85,17 @@ const SURFACE = [
   ]],
   ['tf.textWrapPreferences', ['textWrapMode', 'textWrapOffset']],
   ['doc.pages[0]', ['appliedMaster', 'allPageItems', 'textFrames', 'bounds']],
-  ['doc', ['masterSpreads', 'links', 'stories', 'swatches', 'layers', 'align', 'distribute', 'undo']],
+  ['doc', ['masterSpreads', 'links', 'stories', 'swatches', 'layers', 'align',
+    'distribute', 'undo', 'gradients']],
+  ['tbl', ['headerRowCount', 'footerRowCount', 'columnCount', 'bodyRowCount', 'rows', 'columns', 'cells']],
+  ['tbl.cells[0]', ['fillColor', 'fillTint', 'topEdgeStrokeWeight', 'topEdgeStrokeColor',
+    'bottomEdgeStrokeWeight', 'leftEdgeStrokeWeight', 'rightEdgeStrokeWeight',
+    'verticalJustification', 'topInset', 'leftInset']],
+  ['para', ['leftIndent', 'rightIndent', 'firstLineIndent', 'spaceBefore',
+    'spaceAfter', 'hyphenation', 'keepLinesTogether', 'justification']],
+  ['grad', ['type', 'name', 'gradientStops']],
+  // Only what the server actually writes - midpoint is never set.
+  ['grad.gradientStops[0]', ['stopColor', 'location']],
 ];
 
 /** Enum members the server names explicitly. */
@@ -107,6 +128,9 @@ const ENUMS = {
   Capitalization: ['NORMAL', 'ALL_CAPS'],
   AnchorPoint: ['TOP_LEFT_ANCHOR', 'CENTER_ANCHOR'],
   Flip: ['HORIZONTAL', 'VERTICAL'],
+  BlendMode: ['NORMAL', 'MULTIPLY', 'SCREEN', 'OVERLAY', 'LUMINOSITY'],
+  FeatherMode: ['NONE', 'STANDARD'],
+  GradientType: ['LINEAR', 'RADIAL'],
 };
 
 // Build one script that probes everything and returns a compact report.
@@ -120,6 +144,12 @@ const lines = [
   'var tf = page.textFrames.add();',
   'tf.geometricBounds = [50, 10, 80, 60];',
   'tf.contents = "probe";',
+  'var tt = page.textFrames.add();',
+  'tt.geometricBounds = [90, 10, 140, 60];',
+  'var tbl = tt.parentStory.tables.add();',
+  'tbl.columnCount = 2; tbl.bodyRowCount = 2;',
+  'var para = tf.parentStory.paragraphs[0];',
+  'var grad = doc.gradients.add();',
   'var out = [];',
   'function probe(owner, label, name) {',
   '  var verdict;',

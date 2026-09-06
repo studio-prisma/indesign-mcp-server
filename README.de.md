@@ -333,6 +333,32 @@ asynchron - ohne `waitForProcess()` werden die Ergebnisse gelesen, bevor er
 fertig ist.
 
 
+
+## Effekte, Verläufe, Tabellen und Absätze
+
+`apply_effect` deckt alle neun Effekte ab - Schlag- und Innenschatten, Schein
+nach außen und innen, Abgeflachte Kante, Satin und die drei Weichzeichner -
+dazu die sechzehn Füllmethoden und die Deckkraft des Objekts selbst. Es
+ersetzt das Werkzeug, das nur Schatten konnte. Nicht jede Option passt zu
+jedem Effekt: Abstand und Winkel sind bei Schatten sinnvoll, Größe bei Schein
+und Weichzeichnung. Optionen, die ein Effekt nicht kennt, werden als ignoriert
+gemeldet, statt den Aufruf scheitern zu lassen.
+
+`create_gradient` erzeugt einen linearen oder radialen Verlauf aus
+vorhandenen Farbfeldern und füllt auf Wunsch ein Objekt damit. Stopps sind
+`{ color, location }`, mindestens zwei.
+
+`format_table` behandelt Zellenfüllung, Rahmen, Innenabstände, vertikale
+Ausrichtung, Spaltenbreiten und Kopfzeilen. `rowRange` begrenzt, welche Zeilen
+die Zelleinstellungen treffen - `header`, `body`, `all` oder ein expliziter
+Bereich. Tabellen liegen in Textabschnitten, nicht auf Seiten, und werden
+deshalb über einen dokumentweiten Index angesprochen.
+
+`format_paragraph` setzt Einzüge, Abstand davor und danach, Silbentrennung und
+Zeilen zusammenhalten. `format_text` behandelt die Zeichenattribute, dies die
+Absatzattribute - beide ohne dass zuvor ein Format definiert werden muss.
+
+
 ## Tests
 
 ```bash

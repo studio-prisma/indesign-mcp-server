@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `apply_effect` - all nine effects and the sixteen blend modes, replacing the
+  shadow-only `apply_shadow`.
+- `create_gradient`, `format_table`, `format_paragraph` - gradients, table cell
+  formatting and paragraph settings, none of which the server could do.
+
 - `npm run verify-api` - checks every DOM property and enum member the server
   writes against the running InDesign and fails if one is missing. This class
   of bug is invisible to code review and to the test suite; only the
@@ -43,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or restack them.
 
 ### Changed
+
+- `apply_shadow` is gone, replaced by `apply_effect`. Adding a second tool
+  beside it would have meant two ways to do the same thing.
+- `verify-api` now also covers the effect settings objects, table cells,
+  paragraph attributes and gradients: 238 properties and enum members.
 
 - `place_image` verifies that the import produced artwork instead of reporting
   success either way. A malformed SVG leaves an empty frame behind in
