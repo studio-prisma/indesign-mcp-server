@@ -15,9 +15,14 @@ import { parses } from './harness.mjs';
 import { autoCaptureResult } from '../lib/indesign-driver.js';
 import * as exporters from '../lib/export-tools.js';
 
-const TMP = os.tmpdir();
-const PDF = path.join(TMP, 'probe.pdf');
-const EPUB = path.join(TMP, 'probe.epub');
+// Under the home directory on purpose: file operations are confined to
+// buildAllowedDirs(), which is home plus INDESIGN_ALLOWED_DIRS. os.tmpdir()
+// sits under home on Windows but not on Linux, so a temp path passes here
+// and is refused on CI. Nothing is written - only the script text is built.
+const BASE = os.homedir();
+const PDF = path.join(BASE, 'probe.pdf');
+const EPUB = path.join(BASE, 'probe.epub');
+const TMP = BASE;
 const BS = String.fromCharCode(92);
 const BREAKOUT = 'x' + BS + '"; app.quit(); //';
 
@@ -113,6 +118,17 @@ test('resolution is bounded', () => {
   assert.throws(() => exporters.exportImages({ folderPath: TMP, resolution: 5 }), /out of range/);
   assert.throws(() => exporters.exportImages({ folderPath: TMP, resolution: 9999 }), /out of range/);
   assert.throws(() => exporters.exportImages({ folderPath: TMP, resolution: BREAKOUT }), /Invalid number/);
+});
+
+test('a path outside the allowed directories is refused, on either platform', () => {
+  // This is what broke the first version of this suite: /tmp is inside the
+  // home directory on Windows and outside it on Linux.
+  const outsideHome = process.platform === 'win32' ? 'D:' + BS + 'nope.pdf' : '/tmp/nope.pdf';
+  assert.throws(
+    () => exporters.exportPDF({ filePath: outsideHome }),
+    /Access denied/,
+    'export must stay inside the allowed directories'
+  );
 });
 
 test('paths outside the allowed directories are refused', () => {
