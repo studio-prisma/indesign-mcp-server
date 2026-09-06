@@ -1,18 +1,45 @@
-# indesign-mcp-server
+# InDesign MCP Server
 
-An MCP server that drives Adobe InDesign from a client such as Claude Desktop.
-Build documents, place text and images, restyle and rearrange what is already
-there, check the result, and export it — 83 tools, plus generic access to
-everything they do not wrap.
+[![Validate](https://github.com/studio-prisma/indesign-mcp-server/actions/workflows/validate.yml/badge.svg)](https://github.com/studio-prisma/indesign-mcp-server/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
+[![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
+[![Tools 83](https://img.shields.io/badge/tools-83-6236ff.svg)](#what-it-can-do)
+[![Tests 265](https://img.shields.io/badge/tests-265-brightgreen.svg)](#tests)
 
-Runs on **Windows** (PowerShell + COM) and **macOS** (osascript).
+Drive Adobe InDesign from Claude Desktop or any MCP client — build documents,
+place text and images, restyle and rearrange what is already there, check the
+result before exporting it. 83 tools, every argument validated, plus generic
+access to the rest of the DOM.
 
-Deutsche Fassung: [README.de.md](README.de.md)
+**Windows** (PowerShell + COM) and **macOS** (osascript).
+
+**[Deutsche Fassung →](README.de.md)**
 
 > Fork of [lucdesign/indesign-mcp-server](https://github.com/lucdesign/indesign-mcp-server),
 > which is macOS-only. This fork adds Windows support, validates every tool
 > argument, reports what the document actually looks like, and comes with a
 > test suite. See [Differences from upstream](#differences-from-upstream).
+
+> Maintained by **studio-prisma**.
+
+---
+
+## Why this exists
+
+Two things make scripted InDesign work harder than it looks, and both are
+addressed here.
+
+**A server can tell you what it did, but not what the page looks like.** An
+image import that silently produced nothing still answers "placed"; a text
+frame that cannot show its content still answers "created". `inspect_page` and
+`check_layout` close that gap, and the tools report the document state rather
+than their own success.
+
+**Property names drift between InDesign versions,** and a name the current
+version lacks does not fail quietly — it aborts the whole call, so the tool
+looks broken for unrelated reasons. `npm run verify-api` checks every name
+this server writes against the running application.
 
 ---
 
@@ -77,6 +104,15 @@ arbitrary ExtendScript and bypasses every check described here.
 ---
 
 ## What it can do
+
+| Area | Tools | What it covers |
+|---|:--:|---|
+| **[Seeing the document](#seeing-the-document--18-tools)** | 18 | What is on the page, where, on which layer — and what is wrong with it |
+| **[Building pages](#building-pages--21-tools)** | 21 | Documents, pages, frames, images, tables, layers, threading |
+| **[Changing what is there](#changing-what-is-there--18-tools)** | 18 | Move, resize, restack, align, group, transform, effects |
+| **[Text and styles](#text-and-styles--16-tools)** | 16 | Editing, formatting, find and replace, styles and colours |
+| **[Output](#output--7-tools)** | 7 | PDF, images, EPUB, package, preflight |
+| **[Anything else](#anything-else--3-tools)** | 3 | Generic access to the rest of the DOM |
 
 ### Seeing the document — 18 tools
 
