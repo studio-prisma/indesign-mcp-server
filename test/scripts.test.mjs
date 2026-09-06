@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'node:fs';
 import { runTool, parses } from './harness.mjs';
 import { autoCaptureResult } from '../lib/indesign-driver.js';
 
@@ -48,7 +49,10 @@ const ARGS = {
   folderPath: TMP,
   outputFolder: TMP,
   dataSource: path.join(TMP, 'data.csv'),
-  imagePath: path.join(TMP, 'image.jpg'),
+  imagePath: path.join(os.homedir(), 'image.jpg'),
+  x1: 10, y1: 10, x2: 90, y2: 60,
+  sides: 6, starInset: 0, characterOffset: 3, rotation: 0,
+  pageNumberStart: 1, pageNumberStyle: 'ARABIC', continueNumbering: false,
   confirmDestructive: true,
 };
 
@@ -66,6 +70,8 @@ const METHODS = [
   'applyColor', 'exportPDF', 'exportImages', 'exportEPUB', 'packageDocument',
   'viewDocument', 'createTable', 'populateTable', 'createLayer', 'setActiveLayer',
   'listLayers', 'preflightDocument', 'zoomToPage', 'dataMerge',
+  'createPolygon', 'createLine', 'createAnchoredFrame',
+  'createSection', 'listSections', 'exportIDML',
 ];
 
 for (const method of METHODS) {
@@ -170,4 +176,84 @@ test('the stroke reset cannot take a name from outside this file', async () => {
   for (const r of resets) {
     assert.match(r, /^[A-Za-z_][A-Za-z0-9_]*\.strokeColor/, `suspicious target: ${r}`);
   }
+});
+
+// ------------------------------------------------------- undo and resources
+
+/**
+ * One tool call is one undo step. DoScript takes five arguments for that, and
+ * the two-argument form leaves the history full of InDesign's own labels for
+ * each internal operation - undoing one call then means clicking undo an
+ * unknown number of times.
+ */
+test('the driver groups a script into one named undo step', async () => {
+  const src = await fs.promises.readFile(
+    new URL('../lib/indesign-driver.js', import.meta.url), 'utf8');
+
+  assert.match(src, /UNDO_ENTIRE_SCRIPT = 1699963733/,
+    'the undo mode must be the value read out of InDesign, not a guess');
+  assert.match(src, /DoScript\(\$script, \$\{ID_JAVASCRIPT\}, @\(\), \$\{UNDO_ENTIRE_SCRIPT\}/,
+    'withArguments has to be @() - $null raises inside the COM interop');
+  assert.match(src, /undo mode entire script undo name/,
+    'macOS needs the same grouping');
+});
+
+test('the undo tool itself runs ungrouped', async () => {
+  const src = await fs.promises.readFile(
+    new URL('../index.js', import.meta.url), 'utf8');
+  assert.match(src, /flow\.undoSteps\(args\), \{ undoName: null \}/,
+    'InDesign refuses doc.undo() inside a script recorded as one undo step');
+});
+
+test('an undo label cannot carry anything but a name', async () => {
+  const { withUndoLabel } = await import('../lib/indesign-driver.js');
+  // The label reaches a PowerShell string literal. It comes from the tool
+  // name, never from a caller, and this keeps it that way.
+  assert.equal(typeof withUndoLabel, 'function');
+  const src = await fs.promises.readFile(
+    new URL('../lib/indesign-driver.js', import.meta.url), 'utf8');
+  assert.match(src, /replace\(\/\[\^A-Za-z0-9 _\.-\]\/g, ''\)/,
+    'anything outside the character set must be dropped, not escaped');
+});
+
+test('the resources say the things a tool description cannot', async () => {
+  const guide = await import('../lib/guide.js');
+  assert.equal(guide.RESOURCES.length, 2);
+  for (const r of guide.RESOURCES) {
+    assert.ok(r.uri.startsWith('indesign://'), `odd uri: ${r.uri}`);
+    assert.ok(guide.readResource(r.uri), `${r.uri} has no content`);
+  }
+  assert.equal(guide.readResource('indesign://nothing'), null);
+
+  // The five traps this server exists to explain. If one drops out of the
+  // guide, the model has no way to learn it.
+  for (const needle of [
+    /front to back/i,
+    /millimetres/i,
+    /verify-api/,
+    /modal dialog/i,
+    /one undo step/i,
+  ]) {
+    assert.match(guide.GUIDE, needle, `the guide no longer mentions ${needle}`);
+  }
+});
+
+test('the tool index lists tools that exist', async () => {
+  const guide = await import('../lib/guide.js');
+  const src = await fs.promises.readFile(
+    new URL('../index.js', import.meta.url), 'utf8');
+  const real = new Set([...src.matchAll(/name: '([a-z_0-9]+)',/g)].map((m) => m[1]));
+  const listed = [...guide.TOOL_INDEX.matchAll(/`([a-z_0-9]+)`/g)].map((m) => m[1]);
+  assert.ok(listed.length > 40, `only ${listed.length} tools listed`);
+  for (const name of listed) {
+    if (name.startsWith('npm')) continue;
+    assert.ok(real.has(name), `the index names a tool that does not exist: ${name}`);
+  }
+});
+
+test('the server version comes from the manifest', async () => {
+  const src = await fs.promises.readFile(
+    new URL('../index.js', import.meta.url), 'utf8');
+  assert.match(src, /version: VERSION/, 'a second version literal drifts out of date');
+  assert.doesNotMatch(src, /version: '1\.0\.0'/);
 });

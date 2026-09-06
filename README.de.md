@@ -4,13 +4,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
 [![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
-[![Tools 83](https://img.shields.io/badge/tools-83-6236ff.svg)](#was-er-kann)
-[![Tests 268](https://img.shields.io/badge/tests-268-brightgreen.svg)](#tests)
+[![Tools 89](https://img.shields.io/badge/tools-89-6236ff.svg)](#was-er-kann)
+[![Tests 306](https://img.shields.io/badge/tests-306-brightgreen.svg)](#tests)
 
 Adobe InDesign aus Claude Desktop oder einem beliebigen MCP-Client steuern —
 Dokumente aufbauen, Text und Bilder setzen, Bestehendes umgestalten und
-umsortieren, das Ergebnis vor dem Export prüfen. 83 Werkzeuge, jedes Argument
-geprüft, dazu generischer Zugriff auf den Rest des DOM.
+umsortieren, das Ergebnis vor dem Export prüfen. 89 Werkzeuge, jedes Argument
+geprüft, ein Undo-Schritt je Aufruf, dazu generischer Zugriff auf den Rest des
+DOM.
 
 **Windows** (PowerShell + COM) und **macOS** (osascript).
 
@@ -95,6 +96,16 @@ Fehlt die passende in `WIN_PROGIDS` in
 }
 ```
 
+### Zuerst den Leitfaden laden
+
+Der Server bietet zwei MCP-Resources an: `indesign://guide` und
+`indesign://tools`. Der Leitfaden enthält, wofür eine Werkzeugbeschreibung der
+falsche Ort ist — dass Indizes von vorn nach hinten laufen, dass Geometrie in
+Millimetern und Schriftgrad in Punkt angegeben wird, was ein stilles Scheitern
+bedeutet und was dagegen hilft. In Claude Desktop über das **+** im
+Eingabefeld hinzufügen, bevor die Arbeit losgeht; das senkt die Zahl der
+Aufrufe, die ins Leere laufen, spürbar.
+
 `INDESIGN_ALLOWED_DIRS` begrenzt jede Dateioperation auf die genannten
 Verzeichnisse. Der Trenner ist der Plattform-Trenner — `;` unter Windows, `:`
 unter macOS. Eng halten: ein Arbeitsordner, nicht das Home-Verzeichnis.
@@ -109,14 +120,14 @@ hier beschriebene Prüfung.
 
 | Bereich | Werkzeuge | Wofür |
 |---|:--:|---|
-| **[Das Dokument sehen](#das-dokument-sehen--18-werkzeuge)** | 18 | Was auf der Seite steht, wo, auf welcher Ebene — und was daran nicht stimmt |
-| **[Seiten aufbauen](#seiten-aufbauen--21-werkzeuge)** | 21 | Dokumente, Seiten, Rahmen, Bilder, Tabellen, Ebenen, Verkettung |
+| **[Das Dokument sehen](#das-dokument-sehen--19-werkzeuge)** | 19 | Was auf der Seite steht, wo, auf welcher Ebene — und was daran nicht stimmt |
+| **[Seiten aufbauen](#seiten-aufbauen--25-werkzeuge)** | 25 | Dokumente, Seiten, Rahmen, Formen, Bilder, Tabellen, Ebenen, Verkettung, Abschnitte |
 | **[Bestehendes ändern](#bestehendes-ändern--18-werkzeuge)** | 18 | Verschieben, skalieren, umsortieren, ausrichten, gruppieren, transformieren, Effekte |
 | **[Text und Formate](#text-und-formate--16-werkzeuge)** | 16 | Bearbeiten, formatieren, suchen und ersetzen, Formate und Farben |
-| **[Ausgabe](#ausgabe--7-werkzeuge)** | 7 | PDF, Bilder, EPUB, Verpacken, Preflight |
+| **[Ausgabe](#ausgabe--8-werkzeuge)** | 8 | PDF, Bilder, EPUB, IDML, Verpacken, Preflight |
 | **[Alles Übrige](#alles-übrige--3-werkzeuge)** | 3 | Generischer Zugriff auf den Rest des DOM |
 
-### Das Dokument sehen — 18 Werkzeuge
+### Das Dokument sehen — 19 Werkzeuge
 
 Die wichtigere Hälfte, denn ohne sie ist alles andere Raterei.
 
@@ -131,16 +142,24 @@ Umgebung.
 Dazu `inspect_object`, `get_document_info`, `list_text_frames`, `list_layers`,
 `list_styles`, `list_color_swatches`, `list_master_pages`, `list_links`,
 `get_selected_objects`, `analyze_embedded_objects`, `analyze_text_problems`,
-`find_typography_issues`, `list_grep_searches`, `preflight_document`.
+`find_typography_issues`, `list_grep_searches`, `list_sections`,
+`preflight_document`.
 
-### Seiten aufbauen — 21 Werkzeuge
+### Seiten aufbauen — 25 Werkzeuge
 
 `create_document`, `open_document`, `save_document`, `close_document`,
 `add_page`, `delete_page`, `duplicate_page`, `navigate_to_page`,
-`create_text_frame`, `create_rectangle`, `create_ellipse`, `place_image`,
-`create_table`, `populate_table`, `create_layer`, `set_active_layer`,
-`insert_markdown_text`, `apply_master_page`, `insert_page_number`,
+`create_text_frame`, `create_rectangle`, `create_ellipse`, `create_polygon`,
+`create_line`, `place_image`, `create_anchored_frame`, `create_table`,
+`populate_table`, `create_layer`, `set_active_layer`, `insert_markdown_text`,
+`apply_master_page`, `insert_page_number`, `create_section`,
 `thread_text_frames`, `data_merge`.
+
+`create_polygon` berechnet den Eckpunkt-Pfad — der einzige Weg zu echten
+Ecken, ein ohne ihn angelegtes Polygon ist ein verkapptes Rechteck.
+`create_anchored_frame` setzt einen Rahmen in den laufenden Text, sodass er
+beim Umbruch mitwandert; er muss dort erzeugt werden, weil InDesign sowohl
+`move()` als auch `duplicate()` auf einen Einfügepunkt ablehnt.
 
 `place_image` prüft, ob der Import tatsächlich Grafik erzeugt hat, statt in
 jedem Fall Erfolg zu melden — eine fehlerhafte SVG (ein doppeltes `xmlns`
@@ -168,11 +187,15 @@ Absatz-, Zeichen- und Objektformate sowie `create_color_swatch` und
 `format_text` und `format_paragraph` ändern gesetzten Text, ohne dass zuvor
 ein Format definiert werden muss.
 
-### Ausgabe — 7 Werkzeuge
+### Ausgabe — 8 Werkzeuge
 
-`export_pdf`, `export_images`, `export_epub`, `package_document`,
-`update_links`, `view_document`, `zoom_to_page`. Jeder Export prüft, ob
-tatsächlich eine Datei entstanden ist.
+`export_pdf`, `export_images`, `export_epub`, `export_idml`,
+`package_document`, `update_links`, `view_document`, `zoom_to_page`. Jeder
+Export prüft, ob tatsächlich eine Datei entstanden ist.
+
+`export_idml` ist der Export, bei dem es nicht um das fertige Ergebnis geht:
+IDML öffnet in InDesign CS4 und neuer und in anderen Programmen — der Weg zu
+jemandem, der die .indd nicht öffnen kann.
 
 ### Alles Übrige — 3 Werkzeuge
 
@@ -227,6 +250,17 @@ Größe, und nichts weist ihn zurück: 10 pt ist eine gültige Größe. Die
 Werkzeugbeschreibungen sagen es, und ein Grad unter 4 pt kommt mit einem
 Hinweis zurück. 1 mm sind rund 2,83 pt.
 
+### Undo ist ein Schritt je Aufruf
+
+Jeder Werkzeugaufruf wird als ein einziger, nach dem Werkzeug benannter
+Undo-Schritt aufgezeichnet. Ein Undo nimmt damit den gesamten Aufruf zurück,
+gleich wie viele Objekte er angefasst hat, und im Protokoll steht
+`create_rectangle` statt der InDesign-eigenen Bezeichnung für die letzte
+interne Operation.
+
+Das Werkzeug `undo` geht durch die gesamte Dokumenthistorie zurück, auch durch
+das, was von Hand in der Oberfläche gemacht wurde. Es ist kein eigener Stapel.
+
 ### Wenn ein Werkzeug ohne erkennbaren Grund scheitert
 
 InDesign ignoriert eine Eigenschaft nicht, die es nicht kennt — es wirft, und
@@ -258,7 +292,7 @@ in gesetztem Text, was zählt, wenn exakte Zeichen gebraucht werden.
 | Temp-Dateien | feste Namen im Repo-Verzeichnis | prozess-eigener Ordner unter `os.tmpdir()`, Modus 0700, Aufräumen bei Exit |
 | Argumente | roh in Quelltext eingesetzt | typisiert und geprüft an 366 Einsetzstellen |
 | Rückmeldung | meldet, was getan wurde | meldet, wie das Dokument aussieht |
-| Tests | keine | 268 |
+| Tests | keine | 306 |
 
 Die Argumentprüfung liegt in [lib/jsx-safe.js](lib/jsx-safe.js): `str`, `num`,
 `index`, `measure`, `bool`, `enumOf`, `jsxPath`, `json`, `numList`. Werte, die
@@ -277,7 +311,7 @@ Werkzeug entdeckt werden muss.
 ## Tests
 
 ```bash
-npm test              # 268 Fälle, ohne InDesign
+npm test              # 306 Fälle, ohne InDesign
 npm run lint          # Syntax über alle Module
 npm run verify-api    # DOM-Namen gegen die laufende Anwendung
 ```
@@ -301,6 +335,7 @@ npm run e2e-style      # Transformationen und Gestaltung
 npm run e2e-effect     # Effekte, Verläufe, Tabellen, Absätze
 npm run e2e-export     # Exporte und Preflight
 npm run e2e-generic    # generischer Zugriff samt seiner Grenze
+npm run e2e-shape      # Formen, Abschnitte, IDML und die Undo-Gruppierung
 ```
 
 Jeder markiert das Dokument, das er anlegt, und schließt nur dieses; die

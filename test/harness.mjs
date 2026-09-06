@@ -27,6 +27,7 @@ export async function executeInDesignScript(script) {
 }
 export const platformInfo = { platform: 'mock', mode: 'mock', sessionDir: '(mock)' };
 export function autoCaptureResult(s) { return s; }
+export function withUndoLabel(label, fn) { return fn(); }
 `;
 
 let cached = null;
