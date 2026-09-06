@@ -343,6 +343,58 @@ keeping lines together. `format_text` covers the character attributes; these
 are the paragraph ones, neither of which needs a style to be defined first.
 
 
+
+## Reaching everything else
+
+A tool per task cannot cover InDesign. The DOM has thousands of properties,
+and the specialised tools reach the ones somebody thought to wrap. Three
+tools cover the rest.
+
+`inspect_object` reads any object. Without `properties` it lists every
+readable name and its value, so a caller can find out what an object offers
+without documentation. With `properties` it reads specific ones and says which
+are not available on that object.
+
+`set_properties` writes any properties. Values are numbers, strings, booleans
+and arrays, plus three tagged forms for what a literal cannot express:
+`{ enum: "Justification.CENTER_ALIGN" }`, `{ swatch: "Black" }` and
+`{ measure: 20, unit: "mm" }`. Each assignment is guarded separately, so a
+name this InDesign version lacks is reported without taking the others down.
+
+`call_method` calls one of twenty-three allow-listed methods.
+
+```json
+{ "target": { "kind": "pageItem", "pageIndex": 0, "objectIndex": 2 },
+  "properties": { "nonprinting": true,
+                  "transparencySettings.blendingSettings.knockoutGroup": true } }
+```
+
+Targets are structured, not expressions: `document`, `page`, `pageItem`,
+`textFrame`, `story`, `paragraph`, `character`, `table`, `cell`, `row`,
+`column`, `layer`, `swatch`, the three style kinds, `masterSpread` and
+`application`.
+
+### Why this is not execute_indesign_code
+
+That tool hands over the whole runtime, which is why it stays off. These
+three pass data, never statements:
+
+- **Property paths** are matched segment by segment against
+  `^[A-Za-z][A-Za-z0-9_]*$`, so a path cannot contain a call, an operator or a
+  bracket. `contents; app.quit()` is not a valid name and is refused before
+  any script is built.
+- **Enum references** must be exactly `Name.MEMBER`, two identifiers.
+- **Values** go through the same escaping as everywhere else. A payload sent
+  as a value ends up as text in the document — verified end to end, including
+  that InDesign's smart quotes then edit it, which is the opposite of running
+  it.
+- **Methods** come from a fixed list. `doScript`, `quit` and `eval` are not on
+  it.
+
+So the reachable surface is every property of every object, which is the
+point, and not every statement, which is not.
+
+
 ## Tests
 
 ```bash

@@ -359,6 +359,59 @@ Zeilen zusammenhalten. `format_text` behandelt die Zeichenattribute, dies die
 Absatzattribute - beide ohne dass zuvor ein Format definiert werden muss.
 
 
+
+## An alles andere herankommen
+
+Ein Werkzeug je Aufgabe kann InDesign nicht abdecken. Das DOM hat tausende
+Eigenschaften, und die spezialisierten Werkzeuge erreichen die, an die jemand
+gedacht hat. Drei Werkzeuge decken den Rest ab.
+
+`inspect_object` liest jedes Objekt. Ohne `properties` listet es jeden
+lesbaren Namen samt Wert - so lässt sich ohne Dokumentation herausfinden, was
+ein Objekt bietet. Mit `properties` liest es gezielt und sagt, welche davon es
+an diesem Objekt nicht gibt.
+
+`set_properties` schreibt beliebige Eigenschaften. Werte sind Zahlen, Zeichen-
+ketten, Wahrheitswerte und Listen, dazu drei markierte Formen für das, was
+ein Literal nicht ausdrücken kann: `{ enum: "Justification.CENTER_ALIGN" }`,
+`{ swatch: "Black" }` und `{ measure: 20, unit: "mm" }`. Jede Zuweisung ist
+einzeln abgesichert, ein Name, den diese Version nicht kennt, reißt die
+anderen also nicht mit.
+
+`call_method` ruft eine von 23 freigegebenen Methoden auf.
+
+```json
+{ "target": { "kind": "pageItem", "pageIndex": 0, "objectIndex": 2 },
+  "properties": { "nonprinting": true,
+                  "transparencySettings.blendingSettings.knockoutGroup": true } }
+```
+
+Ziele sind strukturiert, keine Ausdrücke: `document`, `page`, `pageItem`,
+`textFrame`, `story`, `paragraph`, `character`, `table`, `cell`, `row`,
+`column`, `layer`, `swatch`, die drei Formatarten, `masterSpread` und
+`application`.
+
+### Warum das nicht execute_indesign_code ist
+
+Jenes Werkzeug übergibt die gesamte Laufzeit und bleibt deshalb aus. Diese
+drei übergeben Daten, nie Anweisungen:
+
+- **Eigenschaftspfade** werden Segment für Segment gegen
+  `^[A-Za-z][A-Za-z0-9_]*$` geprüft. Ein Pfad kann also keinen Aufruf, keinen
+  Operator und keine Klammer enthalten. `contents; app.quit()` ist kein
+  gültiger Name und wird abgewiesen, bevor überhaupt ein Skript entsteht.
+- **Enum-Verweise** müssen exakt `Name.MITGLIED` sein, zwei Bezeichner.
+- **Werte** laufen durch dasselbe Escaping wie überall sonst. Ein Payload, der
+  als Wert kommt, landet als Text im Dokument - Ende zu Ende geprüft,
+  einschließlich der Tatsache, dass InDesigns typografische Anführungszeichen
+  ihn danach verändern, was das Gegenteil von Ausführen ist.
+- **Methoden** stammen aus einer festen Liste. `doScript`, `quit` und `eval`
+  stehen nicht darauf.
+
+Erreichbar ist damit jede Eigenschaft jedes Objekts - das ist der Zweck - und
+nicht jede Anweisung, was nicht der Zweck ist.
+
+
 ## Tests
 
 ```bash
