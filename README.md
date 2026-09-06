@@ -245,6 +245,43 @@ grouped or restacked. Read `inspect_page` again after any of those rather than
 reusing an index.
 
 
+
+## Changing what already exists
+
+Creating an object and changing one afterwards are different problems, and
+only the first was covered. These four close the gap.
+
+`format_object` sets fill, tint, stroke, stroke alignment, opacity and
+corners. Colours are swatch names; an unknown name lists what the document
+actually has rather than leaving the object unchanged. Pass `"None"` to
+remove a fill or stroke.
+
+`apply_shadow` adds or removes a drop shadow — offsets and blur in mm.
+
+`transform_content` scales, moves or rotates the artwork **inside** a frame,
+leaving the frame alone. That is the missing half of resizing: `resize_object`
+changes the frame, `fit_frame` refits artwork to it, and this one lets you
+crop or reposition by hand. It reports afterwards whether the artwork is
+cropped.
+
+`format_text` changes size, font, colour, alignment, leading and tracking on
+text that is already placed, without defining a style, and warns if the change
+makes the text overflow.
+
+### Two names that are not what they look like
+
+Both verified against InDesign 21.5, both previously wrong in this server:
+
+- **A rectangle has no `cornerRadius`.** Each corner carries its own
+  (`topLeftCornerRadius` and siblings), each with its own `...CornerOption`.
+  `create_rectangle` used the non-existent property, so passing a corner
+  radius raised at runtime. `format_object` sets all four.
+- **`Justification` has no `JUSTIFY`.** The justified members are
+  `LEFT_JUSTIFIED`, `RIGHT_JUSTIFIED`, `CENTER_JUSTIFIED` and
+  `FULLY_JUSTIFIED`. Four tool schemas offered `JUSTIFY`, which the validator
+  then rejected — the tool suggested a value it would not accept.
+
+
 ## Tests
 
 ```bash

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `format_object`, `apply_shadow`, `transform_content`, `format_text` -
+  changing fill, stroke, corners, opacity, shadow, the artwork inside a frame,
+  and character formatting on objects that already exist. Creating an object
+  was covered; changing one afterwards was not.
+
 - `align_objects`, `distribute_objects`, `group_objects`, `ungroup_objects`,
   `transform_object` - arranging and transforming, none of which the server
   could do.
@@ -48,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   note suggesting the conversion.
 
 ### Fixed
+
+- `create_rectangle` set `rect.cornerRadius`, which a rectangle does not have -
+  passing a corner radius raised at runtime. Each corner carries its own
+  radius and option; all four are now set.
+- Four tool schemas offered `JUSTIFY` as an alignment. `Justification` has no
+  such member, so the validator rejected a value the tools themselves
+  suggested. Replaced with the four `_JUSTIFIED` members.
 
 - The confirmation gate for destructive operations did not gate.
   `validateDestructiveOperation` called an async method that only throws,

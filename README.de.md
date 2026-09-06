@@ -254,6 +254,46 @@ Objekte hinzukommen, gelöscht, gruppiert oder umsortiert werden. Danach
 `inspect_page` erneut lesen, statt einen Index wiederzuverwenden.
 
 
+
+## Bestehendes ändern
+
+Ein Objekt anzulegen und eines nachträglich zu ändern sind verschiedene
+Aufgaben, und nur die erste war abgedeckt. Diese vier schließen die Lücke.
+
+`format_object` setzt Füllung, Tonwert, Kontur, Konturausrichtung, Deckkraft
+und Ecken. Farben sind Farbfeldnamen; ein unbekannter Name listet auf, was das
+Dokument tatsächlich hat, statt das Objekt unverändert zu lassen. `"None"`
+entfernt Füllung oder Kontur.
+
+`apply_shadow` setzt oder entfernt einen Schlagschatten — Versatz und
+Weichzeichnung in mm.
+
+`transform_content` skaliert, verschiebt oder dreht die Grafik **im** Rahmen
+und lässt den Rahmen unangetastet. Das ist die fehlende Hälfte des
+Skalierens: `resize_object` ändert den Rahmen, `fit_frame` passt die Grafik
+ein, und dieses Werkzeug erlaubt manuelles Beschneiden und Verschieben. Es
+meldet danach, ob die Grafik beschnitten ist.
+
+`format_text` ändert Größe, Schrift, Farbe, Ausrichtung, Zeilen- und
+Laufweite an bereits gesetztem Text, ohne einen Stil zu definieren, und warnt,
+wenn der Text dadurch überläuft.
+
+### Zwei Namen, die nicht sind, wonach sie aussehen
+
+Beide gegen InDesign 21.5 verifiziert, beide zuvor falsch in diesem Server:
+
+- **Ein Rechteck hat kein `cornerRadius`.** Jede Ecke trägt ihren eigenen
+  (`topLeftCornerRadius` und Geschwister), jede mit eigener `...CornerOption`.
+  `create_rectangle` benutzte die nicht existierende Eigenschaft — ein
+  übergebener Eckenradius führte zur Laufzeit zum Fehler. `format_object`
+  setzt alle vier.
+- **`Justification` kennt kein `JUSTIFY`.** Die Blocksatz-Werte heißen
+  `LEFT_JUSTIFIED`, `RIGHT_JUSTIFIED`, `CENTER_JUSTIFIED` und
+  `FULLY_JUSTIFIED`. Vier Werkzeug-Schemas boten `JUSTIFY` an, das die
+  Validierung dann zurückwies — das Werkzeug schlug einen Wert vor, den es
+  selbst nicht annahm.
+
+
 ## Tests
 
 ```bash

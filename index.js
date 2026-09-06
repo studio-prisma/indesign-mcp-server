@@ -36,6 +36,8 @@ import * as arrange from './lib/arrange-tools.js';
 import * as flow from './lib/flow-tools.js';
 // Reading and searching text.
 import * as text from './lib/text-tools.js';
+// Appearance of existing objects.
+import * as style from './lib/style-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -375,7 +377,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               fontFamily: { type: 'string', description: 'Font family name', default: 'Helvetica Neue' },
               fontStyle: { type: 'string', description: 'Font style (Regular, Bold, Italic, etc.)', default: 'Regular' },
               textColor: { type: 'string', description: 'Text color (RGB hex or name)', default: 'Black' },
-              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN', 'JUSTIFY'], default: 'LEFT_ALIGN' },
+              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN',
+                       'LEFT_JUSTIFIED', 'RIGHT_JUSTIFIED', 'CENTER_JUSTIFIED',
+                       'FULLY_JUSTIFIED'], default: 'LEFT_ALIGN' },
               paragraphStyle: { type: 'string', description: 'Paragraph style name to apply' },
               characterStyle: { type: 'string', description: 'Character style name to apply' },
             },
@@ -398,7 +402,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               },
               fontFamily: { type: 'string', description: 'Font family name' },
               textColor: { type: 'string', description: 'Text color' },
-              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN', 'JUSTIFY'] },
+              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN',
+                       'LEFT_JUSTIFIED', 'RIGHT_JUSTIFIED', 'CENTER_JUSTIFIED',
+                       'FULLY_JUSTIFIED'] },
             },
             required: ['frameIndex'],
           },
@@ -523,7 +529,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               leading: { type: 'number', description: 'Leading (line spacing) in points' },
               spaceBefore: { type: 'number', description: 'Space before paragraph in mm' },
               spaceAfter: { type: 'number', description: 'Space after paragraph in mm' },
-              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN', 'JUSTIFY'] },
+              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN',
+                       'LEFT_JUSTIFIED', 'RIGHT_JUSTIFIED', 'CENTER_JUSTIFIED',
+                       'FULLY_JUSTIFIED'] },
               textColor: { type: 'string', description: 'Text color' },
               baseStyle: { type: 'string', description: 'Base style to inherit from' },
             },
@@ -546,7 +554,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               leading: { type: 'number', description: 'Leading (line spacing) in points' },
               spaceBefore: { type: 'number', description: 'Space before paragraph in mm' },
               spaceAfter: { type: 'number', description: 'Space after paragraph in mm' },
-              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN', 'JUSTIFY'], description: 'Text alignment' },
+              alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN',
+                       'LEFT_JUSTIFIED', 'RIGHT_JUSTIFIED', 'CENTER_JUSTIFIED',
+                       'FULLY_JUSTIFIED'], description: 'Text alignment' },
               textColor: { type: 'string', description: 'Text color (swatch name)' },
             },
             required: ['styleName'],
@@ -1299,6 +1309,111 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             },
           },
         },
+        {
+          name: 'format_object',
+          description:
+            'Change fill, stroke, opacity and corners on an object that already ' +
+            'exists. Colours are swatch names - an unknown name lists what the ' +
+            'document has instead of failing quietly. Pass "None" to remove a fill ' +
+            'or stroke. Rounded corners set all four corners; InDesign has no ' +
+            'single cornerRadius property.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              fillColor: { type: 'string', description: 'Swatch name, or "None"' },
+              fillTint: { type: 'number', description: 'Tint in percent, 0-100' },
+              strokeColor: { type: 'string', description: 'Swatch name, or "None"' },
+              strokeWeight: { type: 'number', description: 'Stroke weight in points' },
+              strokeAlignment: {
+                type: 'string',
+                enum: ['CENTER_ALIGNMENT', 'INSIDE_ALIGNMENT', 'OUTSIDE_ALIGNMENT']
+              },
+              opacity: { type: 'number', description: 'Opacity in percent, 0-100' },
+              cornerRadius: { type: 'number', description: 'Corner radius in mm, all four corners' },
+              cornerStyle: {
+                type: 'string',
+                enum: ['NONE', 'ROUNDED_CORNER', 'INVERSE_ROUNDED_CORNER',
+                       'INSET_CORNER', 'BEVEL_CORNER', 'FANCY_CORNER'],
+                default: 'ROUNDED_CORNER'
+              }
+            },
+            required: ['objectIndex']
+          }
+        },
+        {
+          name: 'apply_shadow',
+          description:
+            'Add or remove a drop shadow on an object. Offsets and blur in mm, ' +
+            'opacity in percent. Pass enabled: false to remove it.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              enabled: { type: 'boolean', default: true },
+              opacity: { type: 'number', default: 75 },
+              xOffset: { type: 'number', description: 'Horizontal offset in mm', default: 2 },
+              yOffset: { type: 'number', description: 'Vertical offset in mm', default: 2 },
+              blur: { type: 'number', description: 'Blur radius in mm', default: 3 }
+            },
+            required: ['objectIndex']
+          }
+        },
+        {
+          name: 'transform_content',
+          description:
+            'Scale, move or rotate the artwork INSIDE a frame, leaving the frame ' +
+            'itself unchanged - this is how you crop or reposition an image by ' +
+            'hand. Use transform_object to change the frame, fit_frame to refit ' +
+            'artwork to it. Reports afterwards whether the artwork is cropped.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              scale: { type: 'number', description: 'Scale both axes, in percent' },
+              scaleX: { type: 'number', description: 'Horizontal scale in percent' },
+              scaleY: { type: 'number', description: 'Vertical scale in percent' },
+              offsetX: { type: 'number', description: 'Move the artwork horizontally, in mm' },
+              offsetY: { type: 'number', description: 'Move the artwork vertically, in mm' },
+              rotation: { type: 'number', description: 'Rotate the artwork, in degrees' }
+            },
+            required: ['objectIndex']
+          }
+        },
+        {
+          name: 'format_text',
+          description:
+            'Change size, font, colour, alignment, leading or tracking of text ' +
+            'that is already placed, without defining a style. Applies to the ' +
+            'whole story of the frame. Warns if the change makes the text ' +
+            'overflow. frameIndex is the list_text_frames numbering. ' +
+            'Note: fontSize is in POINTS while geometry is in mm.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              frameIndex: { type: 'number', description: 'Text frame index on that page' },
+              fontSize: { type: 'number', description: 'Point size, NOT millimetres' },
+              fontFamily: { type: 'string' },
+              fontStyle: { type: 'string', description: 'e.g. Bold, Italic' },
+              textColor: { type: 'string', description: 'Swatch name' },
+              alignment: {
+                type: 'string',
+                enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN',
+                       'LEFT_JUSTIFIED', 'RIGHT_JUSTIFIED', 'CENTER_JUSTIFIED',
+                       'FULLY_JUSTIFIED']
+              },
+              leading: { type: 'number', description: 'Line spacing in points' },
+              tracking: { type: 'number', description: 'Letter spacing, 1/1000 em' },
+              allCaps: { type: 'boolean' },
+              italic: { type: 'boolean' }
+            },
+            required: ['frameIndex']
+          }
+        },
       ],
     }));
 
@@ -1347,6 +1462,12 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             case 'delete_object': return await this.deleteObject(args);
             case 'arrange_object': return await this.arrangeObject(args);
             case 'fit_frame': return await this.fitFrame(args);
+
+            // Appearance of existing objects
+            case 'format_object': return await this.formatObject(args);
+            case 'apply_shadow': return await this.applyShadow(args);
+            case 'transform_content': return await this.transformContent(args);
+            case 'format_text': return await this.formatText(args);
 
             // Arranging and transforming
             case 'align_objects': return await this.alignObjects(args);
@@ -3095,6 +3216,31 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   // =================== GRAPHICS MANAGEMENT ===================
+  // =================== APPEARANCE ===================
+
+  async formatObject(args) {
+    const result = await executeInDesignScript(style.formatObject(args));
+    return this.formatResponse(result, "Format Object");
+  }
+
+  async applyShadow(args) {
+    const result = await executeInDesignScript(style.applyShadow(args));
+    return this.formatResponse(result, "Drop Shadow");
+  }
+
+  async transformContent(args) {
+    const result = await executeInDesignScript(style.transformContent(args));
+    return this.formatResponse(result, "Transform Content");
+  }
+
+  async formatText(args) {
+    const result = await executeInDesignScript(style.formatText(args));
+    return this.formatResponse(
+      this.noteIfSuspiciousFontSize(result, args.fontSize),
+      "Format Text"
+    );
+  }
+
   // =================== ARRANGE, FLOW, MASTERS ===================
 
   async alignObjects(args) {
@@ -3318,7 +3464,16 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           rect.geometricBounds = [${measure(y, { unit: 'mm', name: 'y' })}, ${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y + height, { unit: 'mm', name: 'y' })}, ${measure(x + width, { unit: 'mm', name: 'x' })}];
           
           ${cornerRadius > 0 ? `
-            rect.cornerRadius = ${measure(cornerRadius, { unit: 'mm', name: 'cornerRadius' })};
+            // No cornerRadius on a rectangle - each corner carries its own
+            // radius and option.
+            rect.topLeftCornerOption = CornerOptions.ROUNDED_CORNER;
+            rect.topRightCornerOption = CornerOptions.ROUNDED_CORNER;
+            rect.bottomLeftCornerOption = CornerOptions.ROUNDED_CORNER;
+            rect.bottomRightCornerOption = CornerOptions.ROUNDED_CORNER;
+            rect.topLeftCornerRadius = ${measure(cornerRadius, { unit: 'mm', name: 'cornerRadius' })};
+            rect.topRightCornerRadius = ${measure(cornerRadius, { unit: 'mm', name: 'cornerRadius' })};
+            rect.bottomLeftCornerRadius = ${measure(cornerRadius, { unit: 'mm', name: 'cornerRadius' })};
+            rect.bottomRightCornerRadius = ${measure(cornerRadius, { unit: 'mm', name: 'cornerRadius' })};
           ` : ''}
           
           ${fillColor ? `
