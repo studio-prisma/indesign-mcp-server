@@ -34,6 +34,8 @@ import * as layout from './lib/layout-tools.js';
 import * as arrange from './lib/arrange-tools.js';
 // Text flow, frame setup, master pages, links, undo.
 import * as flow from './lib/flow-tools.js';
+// Reading and searching text.
+import * as text from './lib/text-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -225,14 +227,24 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
         },
         {
           name: 'get_text_content',
-          description: 'Extract raw text content from selected text frame, insertion point, or specific frame. Automatically handles different selection types and normalizes line breaks to spaces. RECOMMENDED for text extraction.',
+          description:
+            'Read text out of the document. The default scope is the whole ' +
+            'document, which is what "check the text" usually means; page reads ' +
+            'every frame on one page, frame reads one frame, selection reads what ' +
+            'is selected. Each block is reported with the frame it came from.',
           inputSchema: {
             type: 'object',
             properties: {
-              normalizeSpaces: { type: 'boolean', description: 'Convert line breaks to spaces and remove multiple spaces', default: true },
-              frameIndex: { type: 'number', description: 'Optional: specific frame index if nothing selected' },
-              pageIndex: { type: 'number', description: 'Page index for frameIndex', default: 0 },
-              maxLength: { type: 'number', description: 'Maximum text length to return (0 = unlimited)', default: 0 }
+              scope: {
+                type: 'string',
+                enum: ['document', 'page', 'frame', 'selection'],
+                description: 'What to read',
+                default: 'document'
+              },
+              pageIndex: { type: 'number', description: 'Page index for scope page or frame', default: 0 },
+              frameIndex: { type: 'number', description: 'Text frame index, required for scope frame' },
+              maxLength: { type: 'number', description: 'Truncate each block; 0 means no limit', default: 0 },
+              normalizeSpaces: { type: 'boolean', description: 'Collapse line breaks and repeated spaces', default: true }
             }
           }
         },
@@ -393,19 +405,48 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
         },
         {
           name: 'find_replace_text',
-          description: 'Find and replace text in the document',
+          description:
+            'Find and replace text across the document. Pass preview: true to ' +
+            'count matches without changing anything, which is safer than ' +
+            'replacing and checking afterwards; use find_text to see them in ' +
+            'context. GREP has no caseSensitive option in InDesign - put (?i) in ' +
+            'the pattern instead.',
           inputSchema: {
             type: 'object',
             properties: {
-              findText: { type: 'string', description: 'Text to find' },
-              replaceText: { type: 'string', description: 'Replacement text' },
-              caseSensitive: { type: 'boolean', description: 'Case sensitive search', default: false },
-              wholeWord: { type: 'boolean', description: 'Whole word only', default: false },
-              useGrep: { type: 'boolean', description: 'Use GREP (regular expressions)', default: false },
-              scope: { type: 'string', enum: ['document', 'story', 'selection'], default: 'document' },
+              findText: { type: 'string', description: 'Text or GREP pattern to find' },
+              replaceText: { type: 'string', description: 'Replacement; an empty string deletes the match' },
+              useGrep: { type: 'boolean', default: false },
+              caseSensitive: { type: 'boolean', description: 'Plain search only, not GREP', default: false },
+              wholeWord: { type: 'boolean', default: false },
+              includeMasterPages: { type: 'boolean', default: false },
+              includeHiddenLayers: { type: 'boolean', default: false },
+              preview: { type: 'boolean', description: 'Count matches without replacing', default: false }
             },
-            required: ['findText', 'replaceText'],
-          },
+            required: ['findText']
+          }
+        },
+        {
+          name: 'find_text',
+          description:
+            'Find text WITHOUT changing it, reporting each hit with its page, ' +
+            'frame and surrounding context. Use this to see what is in a document ' +
+            'before replacing anything. Note that GREP has no caseSensitive option ' +
+            'in InDesign - put (?i) at the start of the pattern instead.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Text or GREP pattern to look for' },
+              useGrep: { type: 'boolean', description: 'Treat query as a GREP pattern', default: false },
+              caseSensitive: { type: 'boolean', description: 'Plain search only, not GREP', default: false },
+              wholeWord: { type: 'boolean', default: false },
+              includeMasterPages: { type: 'boolean', default: false },
+              includeHiddenLayers: { type: 'boolean', default: false },
+              maxHits: { type: 'number', description: 'How many hits to report', default: 50 },
+              contextChars: { type: 'number', description: 'Characters of context per hit', default: 40 }
+            },
+            required: ['query']
+          }
         },
 
         // =================== GRAPHICS MANAGEMENT ===================
@@ -1293,6 +1334,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           case 'create_text_frame': return await this.createTextFrame(args);
           case 'edit_text_frame': return await this.editTextFrame(args);
           case 'find_replace_text': return await this.findReplaceText(args);
+          case 'find_text': return await this.findText(args);
 
           // Graphics Management
           case 'place_image': return await this.placeImage(args);
@@ -1793,100 +1835,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     return this.formatResponse(result, "Get Selected Objects");
   }
 
-  async getTextContent(args) {
-    const { normalizeSpaces = true, frameIndex, pageIndex = 0, maxLength = 0 } = args;
-
-    const script = `
-      if (app.documents.length === 0) {
-        "ERROR: No document open";
-      } else {
-        var doc = app.activeDocument;
-        var textContent = null;
-        var source = "";
-        
-        // Strategy 1: Try to get text from selection
-        if (app.selection.length > 0) {
-          var sel = app.selection[0];
-          
-          if (sel.hasOwnProperty('contents') && sel.contents && sel.contents.length > 0) {
-            // Direct text frame selection with content
-            textContent = sel.contents;
-            source = "Selected text frame";
-          } else if (sel.parentTextFrames && sel.parentTextFrames.length > 0) {
-            // Insertion point or text selection - get parent frame
-            textContent = sel.parentTextFrames[0].contents;
-            source = "Parent text frame of selected insertion point";
-          } else if (sel.constructor.name === "Text") {
-            // Selected text content
-            textContent = sel.contents;
-            source = "Selected text content";
-          } else {
-            source = "Selected object (" + sel.constructor.name + ") has no text content";
-          }
-        }
-        
-        // Strategy 2: Use specific frame index if no selection or selection has no text
-        if (!textContent && typeof ${index(frameIndex, { name: 'frameIndex' })} === "number") {
-          try {
-            var page = doc.pages[${index(pageIndex, { name: 'pageIndex' })}];
-            if (${index(frameIndex, { name: 'frameIndex' })} >= 0 && ${index(frameIndex, { name: 'frameIndex' })} < page.textFrames.length) {
-              textContent = page.textFrames[${index(frameIndex, { name: 'frameIndex' })}].contents;
-              source = "Text frame " + ${index(frameIndex, { name: 'frameIndex' })} + " on page " + (${index(pageIndex, { name: 'pageIndex' })} + 1);
-            } else {
-              source = "ERROR: Frame index " + ${index(frameIndex, { name: 'frameIndex' })} + " invalid. Page " + (${index(pageIndex, { name: 'pageIndex' })} + 1) + " has " + page.textFrames.length + " frames.";
-            }
-          } catch (e) {
-            source = "ERROR: " + e.message;
-          }
-        }
-        
-        // Process text content
-        if (textContent) {
-          var result = "=== TEXT CONTENT ===\\n";
-          result += "Source: " + source + "\\n";
-          result += "Original length: " + textContent.length + " characters\\n\\n";
-          
-          var processedText = textContent;
-          
-          // Normalize spaces if requested
-          ${normalizeSpaces ? `
-            // Convert all types of line breaks to spaces
-            processedText = processedText.replace(/\\r\\n/g, ' ');  // Windows
-            processedText = processedText.replace(/\\r/g, ' ');    // Mac  
-            processedText = processedText.replace(/\\n/g, ' ');    // Unix
-            
-            // Remove multiple spaces
-            while (processedText.indexOf('  ') !== -1) {
-              processedText = processedText.replace(/  /g, ' ');
-            }
-            
-            // Remove leading/trailing spaces (manual trim)
-            while (processedText.charAt(0) === ' ') {
-              processedText = processedText.substring(1);
-            }
-            while (processedText.charAt(processedText.length - 1) === ' ') {
-              processedText = processedText.substring(0, processedText.length - 1);
-            }
-          ` : ''}
-          
-          // Apply length limit if specified
-          ${maxLength > 0 ? `
-            if (processedText.length > ${num(maxLength, { name: 'maxLength' })}) {
-              processedText = processedText.substring(0, ${num(maxLength, { name: 'maxLength' })}) + "...";
-              result += "Text truncated to " + ${num(maxLength, { name: 'maxLength' })} + " characters\\n\\n";
-            }
-          ` : ''}
-          
-          result += "TEXT:\\n" + processedText;
-          result;
-        } else {
-          "ERROR: No text content found. " + source + "\\n\\nTip: Select a text frame, insertion point, or specify frameIndex parameter.";
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
-    return this.formatResponse(result, "Get Text Content");
+  async getTextContent(args = {}) {
+    const result = await executeInDesignScript(text.getTextContent(args));
+    return this.formatResponse(result, "Text Content");
   }
 
   async listTextFrames(args) {
@@ -3134,56 +3085,13 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   async findReplaceText(args) {
-    const { findText, replaceText, caseSensitive = false, wholeWord = false, useGrep = false, scope = 'document' } = args;
+    const result = await executeInDesignScript(text.findReplaceText(args));
+    return this.formatResponse(result, "Find and Replace");
+  }
 
-    const script = `
-      if (app.documents.length === 0) {
-        "No document open";
-      } else {
-        var doc = app.activeDocument;
-        try {
-          // Clear previous search settings
-          app.findTextPreferences = NothingEnum.nothing;
-          app.changeTextPreferences = NothingEnum.nothing;
-          
-          // Set find preferences
-          ${useGrep ? `
-            app.findGrepPreferences.findWhat = ${str(findText)};
-            app.changeGrepPreferences.changeTo = ${str(replaceText)};
-          ` : `
-            app.findTextPreferences.findWhat = ${str(findText)};
-            app.changeTextPreferences.changeTo = ${str(replaceText)};
-            app.findTextPreferences.caseSensitive = ${bool(caseSensitive)};
-            app.findTextPreferences.wholeWord = ${bool(wholeWord)};
-          `}
-          
-          var foundItems;
-          var changeCount = 0;
-          
-          ${scope === 'document' ? `
-            foundItems = ${useGrep ? 'doc.findGrep()' : 'doc.findText()'};
-            changeCount = ${useGrep ? 'doc.changeGrep()' : 'doc.changeText()'}.length;
-          ` : `
-            // Handle other scopes (story, selection) if needed
-            foundItems = ${useGrep ? 'doc.findGrep()' : 'doc.findText()'};
-            changeCount = ${useGrep ? 'doc.changeGrep()' : 'doc.changeText()'}.length;
-          `}
-          
-          // Clear preferences
-          app.findTextPreferences = NothingEnum.nothing;
-          app.changeTextPreferences = NothingEnum.nothing;
-          app.findGrepPreferences = NothingEnum.nothing;
-          app.changeGrepPreferences = NothingEnum.nothing;
-          
-          "Found and replaced " + changeCount + " instances of '" + ${str(findText)} + "' with '" + ${str(replaceText)} + "'";
-        } catch (e) {
-          "Error in find/replace: " + e.message;
-        }
-      }
-    `;
-
-    const result = await executeInDesignScript(script);
-    return this.formatResponse(result, "Find/Replace Text");
+  async findText(args) {
+    const result = await executeInDesignScript(text.findText(args));
+    return this.formatResponse(result, "Find Text");
   }
 
   // =================== GRAPHICS MANAGEMENT ===================
