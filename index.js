@@ -133,7 +133,11 @@ class InDesignMCPServer {
   }
 
   // Security: User confirmation for destructive operations
-  async requireUserConfirmation(operation, target, details = '') {
+  // Not async: it only ever throws. As an async method the rejection was
+  // never awaited by validateDestructiveOperation, so it surfaced as an
+  // unhandled rejection while the caller carried on and performed the
+  // operation anyway - the confirmation gate did not actually gate.
+  requireUserConfirmation(operation, target, details = '') {
     const warningMessage = `
 ⚠️  DESTRUCTIVE OPERATION WARNING ⚠️
 

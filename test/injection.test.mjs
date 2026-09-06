@@ -238,3 +238,17 @@ test('execute_indesign_code stays locked without the opt-in', async () => {
   const locked = Boolean(error) || script === null || /disabled|not enabled/i.test(String(script));
   assert.ok(locked, 'executeInDesignCode was reachable without INDESIGN_ALLOW_ARBITRARY_CODE');
 });
+
+test('the destructive-operation guard actually blocks', async () => {
+  const { loadServer } = await import('./harness.mjs');
+  const { server } = await loadServer();
+  assert.throws(
+    () => server.validateDestructiveOperation({}, 'test operation', 'test target'),
+    /confirmation required/i,
+    'the guard did not throw - callers would carry on and perform the operation'
+  );
+  assert.doesNotThrow(
+    () => server.validateDestructiveOperation({ confirmDestructive: true }, 'test', 'target'),
+    'the guard blocked a confirmed operation'
+  );
+});
