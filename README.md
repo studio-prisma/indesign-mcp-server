@@ -340,9 +340,13 @@ return messages.
 - macOS support is inherited from upstream and not covered by the end-to-end
   tests here.
 - Tools act on the active document; there is no document selection.
-- Not wrapped, though reachable through `set_properties`: interactive features
-  (hyperlinks, buttons), articles, table of contents, index, books, the
-  pathfinder, guides and the ink manager.
+- Not wrapped, but reachable through `set_properties`: interactive features
+  (hyperlinks, buttons), articles, guides and the ink manager - anything that
+  is a property of an object that already exists.
+- Not reachable at all: table of contents, index, cross-references, books
+  (.indb), table and cell styles. Each needs a method call on a collection,
+  and creating something is deliberately not in the generic layer's
+  allow-list. These need tools of their own.
 - Upstream does not carry these changes. Re-check after every merge from it.
 
 ## Licence

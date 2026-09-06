@@ -14,12 +14,13 @@ Thanks for taking the time. This project is small and maintained in spare time �
 git clone https://github.com/studio-prisma/indesign-mcp-server.git
 cd indesign-mcp-server
 npm ci
-npm test          # 75 cases, no InDesign required
+npm test          # 306 cases, no InDesign required
 ```
 
 The test suite mocks the platform driver, so you can work on argument
-handling and script generation without InDesign installed. Only
-`npm run smoke` and `npm run e2e` need a running instance.
+handling and script generation without InDesign installed. Only `npm run
+smoke`, `npm run verify-api` and the `npm run e2e-*` scripts need a running
+instance.
 
 Requirements are listed in [README.md](README.md#requirements). State versions you have verified, not versions you expect to work.
 
@@ -27,7 +28,7 @@ Requirements are listed in [README.md](README.md#requirements). State versions y
 
 ```bash
 npm run lint      # syntax check
-npm test          # 75 cases
+npm test          # 306 cases
 ```
 
 If your change touches a script template, `npm test` is not optional:
@@ -38,6 +39,16 @@ InDesign.
 If your change touches `lib/jsx-safe.js`, add a case to
 `test/injection.test.mjs`. A helper without a payload test is an
 assertion, not a guarantee.
+
+If your change sets a DOM property or names an enum member, add it to
+`scripts/verify-api.mjs` and run it against a real InDesign. A name this
+version dropped does not fail quietly — it aborts the whole call, and the tool
+looks broken for reasons unrelated to what it was asked to do. Reading the
+code cannot catch that; only asking the application can.
+
+Read values back out of the document in the end-to-end scripts rather than
+trusting a return message. A tool reports what it did; only the document says
+what happened.
 
 CI runs the same checks on every push and pull request. The aggregating job is called **Gate**; it is the only status check the branch protection requires, and it is green only when every other job is.
 
@@ -57,6 +68,10 @@ A red pipeline is not mergeable. If a check fails for a reason unrelated to your
 Documentation is part of the change, not a follow-up.
 
 - Behaviour change → update `README.md` **and** `README.de.md` in the same PR.
+- Anything a caller has to know *before* choosing a tool → `lib/guide.js`. It
+  is served as the `indesign://guide` MCP resource, which is the only
+  documentation the model reads. A tool description is the wrong place for it:
+  it is read when the model is already reaching for that tool.
 - Setup or configuration change → update the setup section of both READMEs. There is no separate install guide: setup is `npm ci` plus one JSON block, and a second copy would only drift.
 - New limitation discovered → add it to "Known limitations". A limitation users find in production is a bug report; one they read in advance is a decision.
 
