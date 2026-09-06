@@ -96,6 +96,15 @@ const SURFACE = [
   ['grad', ['type', 'name', 'gradientStops']],
   // Only what the server actually writes - midpoint is never set.
   ['grad.gradientStops[0]', ['stopColor', 'location']],
+  // Shapes and sections.
+  ['doc.pages[0]', ['polygons', 'graphicLines', 'ovals', 'rectangles']],
+  ['poly.paths[0]', ['entirePath']],
+  ['doc.sections[0]', ['pageStart', 'continueNumbering', 'pageNumberStart',
+    'pageNumberStyle', 'sectionPrefix', 'includeSectionPrefix', 'marker']],
+  // anchorYoffset, not anchorYOffset. AnchoredPosition does not exist either -
+  // the enum is AnchorPosition, see ENUMS below.
+  ['anchored.anchoredObjectSettings', ['anchoredPosition', 'anchorYoffset',
+    'anchorXoffset', 'spineRelative']],
 ];
 
 /** Enum members the server names explicitly. */
@@ -118,7 +127,8 @@ const ENUMS = {
   ShadowMode: ['NONE', 'DROP'],
   ColorSpace: ['CMYK', 'RGB', 'LAB'],
   ColorModel: ['PROCESS', 'SPOT', 'REGISTRATION'],
-  ExportFormat: ['PDF_TYPE', 'JPG', 'PNG_FORMAT', 'EPUB', 'FIXED_LAYOUT_EPUB'],
+  ExportFormat: ['PDF_TYPE', 'JPG', 'PNG_FORMAT', 'EPUB', 'FIXED_LAYOUT_EPUB',
+    'INDESIGN_MARKUP'],
   PageRange: ['ALL_PAGES'],
   JPEGOptionsQuality: ['LOW', 'MEDIUM', 'HIGH', 'MAXIMUM'],
   PNGExportRangeEnum: ['EXPORT_ALL', 'EXPORT_RANGE'],
@@ -131,6 +141,13 @@ const ENUMS = {
   BlendMode: ['NORMAL', 'MULTIPLY', 'SCREEN', 'OVERLAY', 'LUMINOSITY'],
   FeatherMode: ['NONE', 'STANDARD'],
   GradientType: ['LINEAR', 'RADIAL'],
+  // Read out of 21.5: KATAKANA_MODERN and FULL_WIDTH_ARABIC appear in older
+  // references and are not there.
+  PageNumberStyle: ['ARABIC', 'LOWER_ROMAN', 'UPPER_ROMAN', 'LOWER_LETTERS',
+    'UPPER_LETTERS', 'KANJI', 'SINGLE_LEADING_ZEROS', 'DOUBLE_LEADING_ZEROS',
+    'TRIPLE_LEADING_ZEROS'],
+  AnchorPosition: ['INLINE_POSITION', 'ABOVE_LINE', 'ANCHORED'],
+  UndoModes: ['ENTIRE_SCRIPT'],
 };
 
 // Build one script that probes everything and returns a compact report.
@@ -150,6 +167,10 @@ const lines = [
   'tbl.columnCount = 2; tbl.bodyRowCount = 2;',
   'var para = tf.parentStory.paragraphs[0];',
   'var grad = doc.gradients.add();',
+  'var poly = page.polygons.add();',
+  'poly.paths[0].entirePath = [[10, 150], [60, 150], [35, 190]];',
+  'var anchored = tf.parentStory.insertionPoints[2].rectangles.add();',
+  'anchored.geometricBounds = [0, 0, 8, 8];',
   'var out = [];',
   'function probe(owner, label, name) {',
   '  var verdict;',

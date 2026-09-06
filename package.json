@@ -1,14 +1,14 @@
 {
   "name": "indesign-mcp-server",
-  "version": "2.1.0",
-  "description": "MCP server for Adobe InDesign. Windows and macOS, 83 tools, validated arguments, and generic access to the rest of the DOM.",
+  "version": "2.2.0",
+  "description": "MCP server for Adobe InDesign. Windows and macOS, 89 tools, validated arguments, one undo step per call, and generic access to the rest of the DOM.",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "node --inspect index.js",
-    "test": "node --test test/scripts.test.mjs test/injection.test.mjs test/layout.test.mjs test/arrange.test.mjs test/text.test.mjs test/style.test.mjs test/export.test.mjs test/effect.test.mjs test/generic.test.mjs",
-    "lint": "node --check index.js && node --check lib/indesign-driver.js && node --check lib/jsx-safe.js && node --check lib/layout-tools.js && node --check lib/arrange-tools.js && node --check lib/flow-tools.js && node --check lib/text-tools.js && node --check lib/style-tools.js && node --check lib/export-tools.js && node --check lib/effect-tools.js && node --check lib/generic-tools.js",
+    "test": "node --test test/scripts.test.mjs test/injection.test.mjs test/layout.test.mjs test/arrange.test.mjs test/text.test.mjs test/style.test.mjs test/export.test.mjs test/effect.test.mjs test/generic.test.mjs test/shape.test.mjs",
+    "lint": "node --check index.js && node --check lib/indesign-driver.js && node --check lib/jsx-safe.js && node --check lib/layout-tools.js && node --check lib/arrange-tools.js && node --check lib/flow-tools.js && node --check lib/text-tools.js && node --check lib/style-tools.js && node --check lib/export-tools.js && node --check lib/effect-tools.js && node --check lib/generic-tools.js && node --check lib/shape-tools.js && node --check lib/guide.js",
     "smoke": "node scripts/smoke.mjs",
     "e2e": "node scripts/e2e.mjs",
     "e2e-layout": "node scripts/e2e-layout.mjs",
@@ -18,7 +18,8 @@
     "verify-api": "node scripts/verify-api.mjs",
     "e2e-export": "node scripts/e2e-export.mjs",
     "e2e-effect": "node scripts/e2e-effect.mjs",
-    "e2e-generic": "node scripts/e2e-generic.mjs"
+    "e2e-generic": "node scripts/e2e-generic.mjs",
+    "e2e-shape": "node scripts/e2e-shape.mjs"
   },
   "keywords": [
     "mcp",

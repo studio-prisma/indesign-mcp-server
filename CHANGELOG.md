@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-06
+
+Undo becomes usable, the server can say things a tool description cannot, and
+six object types and formats that were out of reach are now covered. Also
+fixes 2.1.0, whose stroke change had no effect at all.
+
+### Fixed
+
+- **The stroke fix in 2.1.0 did not work.** It set the colour and then the
+  weight; a `strokeWeight` assignment made *after* the colour pulls the item
+  defaults back, and the object keeps the black 1 pt stroke it was supposed to
+  lose. The two orders look identical and only one of them does anything.
+  Reproduced against InDesign 21.5 on rectangles, polygons and text frames,
+  and now covered by a test that reads the order out of the generated script.
+
+  The same wrong order sat in `format_object`, where it only showed when both
+  `strokeColor` and `strokeWeight` were passed in one call.
+
+  2.1.0 shipped with the honest note that the end-to-end check could not run
+  because a document was open. This is what that check would have caught.
+
+### Added
+
+- **One undo step per tool call, named after the tool.** `DoScript` takes an
+  undo mode and a name; the server was passing neither, so InDesign recorded
+  one history entry per internal operation, labelled in the interface
+  language. Undoing a single call meant clicking undo an unknown number of
+  times, past entries reading "Resize". Now one call is one step, the history
+  says `create_rectangle`, and one undo reverses the whole call however many
+  objects it touched.
+
+  The `undo` tool itself runs ungrouped — InDesign refuses `doc.undo()` inside
+  a script that is being recorded as one undo step.
+
+  `withArguments` has to be an empty array, not `$null`: passing null raises a
+  NullReferenceException inside the COM interop before InDesign sees the call.
+
+- **MCP resources.** `indesign://guide` and `indesign://tools`. A tool
+  description is read when the model is already reaching for that tool, which
+  makes it the wrong place for what you need to know beforehand: that indices
+  run front to back, that geometry is millimetres while type is points, what a
+  silent failure means and what to do about it. A client can load a resource
+  before it starts choosing tools.
+
+- `create_polygon` — regular polygons and stars. The corner path is computed
+  and written to `paths[0].entirePath`; a polygon added without one is a
+  rectangle in disguise.
+- `create_line` — a straight line between two points, with an optional stroke
+  style.
+- `create_anchored_frame` — a frame anchored in running text, so it moves when
+  the text reflows. It has to be *created* on the insertion point: InDesign
+  21.5 refuses both `move()` and `duplicate()` to one, so an object that
+  already exists cannot be taken into the text.
+- `create_section` and `list_sections` — page-numbering sections, which is how
+  front matter numbers i, ii, iii while the body starts again at 1.
+- `export_idml` — the interchange format. Opens in InDesign CS4 and newer and
+  in other tools, so it is the way to hand a layout to somebody who cannot
+  open the .indd. Not reachable through `call_method`, because `exportFile`
+  needs a File object and the generic layer passes data, never constructed
+  objects.
+
+### Changed
+
+- The server reports the version from `package.json`. It was a second literal
+  and had said 1.0.0 since 1.0.0.
+- `verify-api` covers the new surface: polygons, graphic lines, sections,
+  anchored object settings, and the `PageNumberStyle`, `AnchorPosition`,
+  `UndoModes` and `ExportFormat.INDESIGN_MARKUP` members. 267 names checked.
+  `AnchoredPosition` does not exist — the enum is `AnchorPosition`; and
+  `PageNumberStyle` has neither `KATAKANA_MODERN` nor `FULL_WIDTH_ARABIC`,
+  though both appear in older references.
+- `npm run e2e-shape` — end-to-end for the new tools, reading the corner count
+  off the polygon's own path, the page names off the pages, and the anchored
+  frame's parent out of the story.
+
 ## [2.1.0] - 2026-09-06
 
 ### Changed
@@ -213,7 +288,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/studio-prisma/indesign-mcp-server/releases/tag/v1.0.0

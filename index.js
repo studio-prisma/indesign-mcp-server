@@ -5,13 +5,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ErrorCode,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { createRequire } from 'node:module';
 // Script execution lives entirely in the platform driver (Windows ->
 // PowerShell/COM, macOS -> osascript). The server itself knows nothing
 // platform-specific and creates no temp files.
-import { executeInDesignScript, platformInfo } from './lib/indesign-driver.js';
+import { executeInDesignScript, platformInfo, withUndoLabel } from './lib/indesign-driver.js';
 // No tool argument reaches ExtendScript source unvalidated.
 import {
   str,
@@ -44,6 +47,15 @@ import * as exporters from './lib/export-tools.js';
 import * as fx from './lib/effect-tools.js';
 // Generic property access for everything the specialised tools do not reach.
 import * as generic from './lib/generic-tools.js';
+// Polygons, lines and anchored frames - object types the generic layer
+// cannot create, because creating is not one of its allowed methods.
+import * as shapes from './lib/shape-tools.js';
+// What the tool descriptions cannot say, offered as MCP resources.
+import { RESOURCES, readResource } from './lib/guide.js';
+
+// One version, read from the manifest. It used to be a second literal here
+// and had been wrong since 1.0.0.
+const { version: VERSION } = createRequire(import.meta.url)('./package.json');
 
 /**
  * InDesign gives every newly created page item the application's default
@@ -59,9 +71,13 @@ function clearDefaultStroke(varName) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(varName)) {
     throw new Error(`clearDefaultStroke: not an identifier: ${varName}`);
   }
+  // Weight first, then colour. The other order silently loses both: assigning
+  // strokeWeight after the colour pulls the item defaults back, and the object
+  // ends up with the black 1 pt stroke again. Reproduced on rectangles,
+  // polygons and text frames in 21.5.
   return `try {
-              ${varName}.strokeColor = doc.swatches.itemByName("None");
               ${varName}.strokeWeight = 0;
+              ${varName}.strokeColor = doc.swatches.itemByName("None");
             } catch (e) {}`;
 }
 
@@ -70,11 +86,15 @@ class InDesignMCPServer {
     this.server = new Server(
       {
         name: 'indesign-server-complete',
-        version: '1.0.0',
+        version: VERSION,
       },
       {
         capabilities: {
           tools: {},
+          // Resources carry the things a tool description is the wrong place
+          // for: index order, units, what a silent failure means. A client can
+          // load them before it starts choosing tools.
+          resources: {},
         },
       }
     );
@@ -84,6 +104,7 @@ class InDesignMCPServer {
     this.allowedDirectories = buildAllowedDirs();
 
     this.setupToolHandlers();
+    this.setupResourceHandlers();
   }
 
   /**
@@ -132,6 +153,21 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
       this.requireUserConfirmation(operation, target);
     }
     // User has explicitly confirmed - proceed with operation
+  }
+
+  setupResourceHandlers() {
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: RESOURCES,
+    }));
+
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      const text = readResource(uri);
+      if (text === null) {
+        throw new McpError(ErrorCode.InvalidRequest, `Unknown resource: ${uri}`);
+      }
+      return { contents: [{ uri, mimeType: 'text/markdown', text }] };
+    });
   }
 
   setupToolHandlers() {
@@ -1707,134 +1743,278 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             required: ['target', 'method']
           }
         },
+        {
+          name: 'create_polygon',
+          description:
+            'Draw a regular polygon or a star inside the given box. sides is the ' +
+            'corner count; starInset above 0 turns it into a star, as a percentage ' +
+            'of the radius pulled in on every second corner. Geometry in mm.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              x: { type: 'number', description: 'Left edge in mm' },
+              y: { type: 'number', description: 'Top edge in mm' },
+              width: { type: 'number', description: 'Width in mm' },
+              height: { type: 'number', description: 'Height in mm' },
+              sides: { type: 'number', description: 'Number of corners, 3 to 100', default: 6 },
+              starInset: { type: 'number', description: 'Star inset in percent, 0 for a plain polygon', default: 0 },
+              pageIndex: { type: 'number', default: 0 },
+              fillColor: { type: 'string', description: 'Swatch name' },
+              strokeColor: { type: 'string', description: 'Swatch name. Omitted means no stroke.' },
+              strokeWidth: { type: 'number', description: 'Stroke weight in points', default: 1 },
+              rotation: { type: 'number', description: 'Rotation in degrees', default: 0 },
+            },
+            required: ['x', 'y', 'width', 'height'],
+          },
+        },
+        {
+          name: 'create_line',
+          description:
+            'Draw a straight line between two points. Geometry in mm, stroke weight ' +
+            'in points. strokeType takes the name of a stroke style, e.g. "Dashed".',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              x1: { type: 'number', description: 'Start x in mm' },
+              y1: { type: 'number', description: 'Start y in mm' },
+              x2: { type: 'number', description: 'End x in mm' },
+              y2: { type: 'number', description: 'End y in mm' },
+              pageIndex: { type: 'number', default: 0 },
+              strokeColor: { type: 'string', description: 'Swatch name', default: 'Black' },
+              strokeWidth: { type: 'number', description: 'Stroke weight in points', default: 1 },
+              strokeType: { type: 'string', description: 'Stroke style name, e.g. Dashed' },
+            },
+            required: ['x1', 'y1', 'x2', 'y2'],
+          },
+        },
+        {
+          name: 'create_anchored_frame',
+          description:
+            'Create a frame anchored inside running text, so it moves when the text ' +
+            'reflows. characterOffset is a position in the story - find_text reports ' +
+            'its hits with one. Pass content for a text frame or imagePath for a ' +
+            'picture. An object that already exists cannot be moved into text; ' +
+            'InDesign refuses both move() and duplicate() to an insertion point.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', default: 0 },
+              frameIndex: { type: 'number', description: 'Text frame on the page, front to back', default: 0 },
+              characterOffset: { type: 'number', description: 'Character position in the story', default: 0 },
+              width: { type: 'number', description: 'Width in mm' },
+              height: { type: 'number', description: 'Height in mm' },
+              content: { type: 'string', description: 'Text for the anchored frame' },
+              imagePath: { type: 'string', description: 'Image to place instead of text' },
+              position: {
+                type: 'string',
+                enum: ['INLINE_POSITION', 'ABOVE_LINE', 'ANCHORED'],
+                default: 'INLINE_POSITION',
+              },
+              yOffset: { type: 'number', description: 'Vertical offset in mm', default: 0 },
+              fillColor: { type: 'string', description: 'Swatch name' },
+              strokeColor: { type: 'string', description: 'Swatch name. Omitted means no stroke.' },
+              strokeWidth: { type: 'number', default: 1 },
+            },
+            required: ['width', 'height'],
+          },
+        },
+        {
+          name: 'create_section',
+          description:
+            'Start a page-numbering section on a page, or change the one that already ' +
+            'starts there. This is how front matter numbers i, ii, iii while the body ' +
+            'starts again at 1. Reports the page names afterwards, because those are ' +
+            'what actually changed.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page the section starts on', default: 0 },
+              continueNumbering: {
+                type: 'boolean',
+                description: 'Carry on from the previous section instead of restarting',
+                default: false,
+              },
+              pageNumberStart: { type: 'number', description: 'First number of this section', default: 1 },
+              pageNumberStyle: {
+                type: 'string',
+                enum: ['ARABIC', 'LOWER_ROMAN', 'UPPER_ROMAN', 'LOWER_LETTERS',
+                       'UPPER_LETTERS', 'KANJI', 'SINGLE_LEADING_ZEROS',
+                       'DOUBLE_LEADING_ZEROS', 'TRIPLE_LEADING_ZEROS'],
+                default: 'ARABIC',
+              },
+              sectionPrefix: { type: 'string', description: 'Prefix such as A or App' },
+              includeSectionPrefix: { type: 'boolean', description: 'Show the prefix in page numbers', default: false },
+              marker: { type: 'string', description: 'Section marker text, usable in running heads' },
+            },
+          },
+        },
+        {
+          name: 'list_sections',
+          description:
+            'List the page-numbering sections: where each starts, its numbering style ' +
+            'and prefix. Every document has at least one.',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'export_idml',
+          description:
+            'Export the document as IDML, the interchange format. Opens in InDesign ' +
+            'CS4 and newer and in other tools, so it is the way to hand a layout to ' +
+            'somebody who cannot open the .indd.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              filePath: { type: 'string', description: 'Output .idml file path' },
+              confirmDestructive: { type: 'boolean', description: 'REQUIRED: Confirm file overwrite', default: false },
+            },
+            required: ['filePath'],
+          },
+        },
       ],
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-
-      try {
-        switch (name) {
-          // Document Management
-          case 'get_document_info': return await this.getDocumentInfo();
-          case 'create_document': return await this.createDocument(args);
-          case 'open_document': return await this.openDocument(args);
-          case 'save_document': return await this.saveDocument(args);
-          case 'close_document': return await this.closeDocument(args);
-
-          // Page Management
-          case 'add_page': return await this.addPage(args);
-          case 'delete_page': return await this.deletePage(args);
-          case 'duplicate_page': return await this.duplicatePage(args);
-          case 'navigate_to_page': return await this.navigateToPage(args);
-
-          // Text Management
-          case 'get_selected_objects': return await this.getSelectedObjects();
-          case 'get_text_content': return await this.getTextContent(args);
-          case 'list_text_frames': return await this.listTextFrames(args);
-          case 'analyze_embedded_objects': return await this.analyzeEmbeddedObjects(args);
-          case 'insert_markdown_text': return await this.insertMarkdownText(args);
-          case 'fix_typography_in_selection': return await this.fixTypographyInSelection(args);
-          case 'find_typography_issues': return await this.findTypographyIssues(args);
-          case 'clean_imported_text': return await this.cleanImportedText(args);
-          case 'analyze_text_problems': return await this.analyzeTextProblems(args);
-          case 'list_grep_searches': return await this.listGrepSearches();
-          case 'create_text_frame': return await this.createTextFrame(args);
-          case 'edit_text_frame': return await this.editTextFrame(args);
-          case 'find_replace_text': return await this.findReplaceText(args);
-          case 'find_text': return await this.findText(args);
-
-          // Graphics Management
-          case 'place_image': return await this.placeImage(args);
-
-            // Layout inspection and object manipulation
-            // Generic access
-            case 'inspect_object': return await this.inspectObject(args);
-            case 'set_properties': return await this.setProperties(args);
-            case 'call_method': return await this.callMethod(args);
-
-            case 'inspect_page': return await this.inspectPage(args);
-            case 'check_layout': return await this.checkLayout(args);
-            case 'move_object': return await this.moveObject(args);
-            case 'resize_object': return await this.resizeObject(args);
-            case 'delete_object': return await this.deleteObject(args);
-            case 'arrange_object': return await this.arrangeObject(args);
-            case 'fit_frame': return await this.fitFrame(args);
-
-            // Appearance of existing objects
-            case 'format_object': return await this.formatObject(args);
-            case 'apply_effect': return await this.applyEffect(args);
-            case 'create_gradient': return await this.createGradient(args);
-            case 'format_table': return await this.formatTable(args);
-            case 'format_paragraph': return await this.formatParagraph(args);
-            case 'transform_content': return await this.transformContent(args);
-            case 'format_text': return await this.formatText(args);
-
-            // Arranging and transforming
-            case 'align_objects': return await this.alignObjects(args);
-            case 'distribute_objects': return await this.distributeObjects(args);
-            case 'group_objects': return await this.groupObjects(args);
-            case 'ungroup_objects': return await this.ungroupObjects(args);
-            case 'transform_object': return await this.transformObject(args);
-
-            // Text flow, masters, links, undo
-            case 'thread_text_frames': return await this.threadTextFrames(args);
-            case 'set_text_frame_options': return await this.setTextFrameOptions(args);
-            case 'set_text_wrap': return await this.setTextWrap(args);
-            case 'list_master_pages': return await this.listMasterPages();
-            case 'apply_master_page': return await this.applyMasterPage(args);
-            case 'insert_page_number': return await this.insertPageNumber(args);
-            case 'list_links': return await this.listLinks();
-            case 'update_links': return await this.updateLinks(args);
-            case 'undo': return await this.undoSteps(args);
-          case 'create_rectangle': return await this.createRectangle(args);
-          case 'create_ellipse': return await this.createEllipse(args);
-
-          // Style Management
-          case 'create_paragraph_style': return await this.createParagraphStyle(args);
-          case 'modify_paragraph_style': return await this.modifyParagraphStyle(args);
-          case 'create_character_style': return await this.createCharacterStyle(args);
-          case 'modify_character_style': return await this.modifyCharacterStyle(args);
-          case 'create_object_style': return await this.createObjectStyle(args);
-          case 'modify_object_style': return await this.modifyObjectStyle(args);
-          case 'apply_paragraph_style': return await this.applyParagraphStyle(args);
-          case 'apply_object_style': return await this.applyObjectStyle(args);
-          case 'list_styles': return await this.listStyles(args);
-
-          // Color Management
-          case 'create_color_swatch': return await this.createColorSwatch(args);
-          case 'list_color_swatches': return await this.listColorSwatches();
-          case 'apply_color': return await this.applyColor(args);
-
-          // Table Management
-          case 'create_table': return await this.createTable(args);
-          case 'populate_table': return await this.populateTable(args);
-
-          // Layer Management
-          case 'create_layer': return await this.createLayer(args);
-          case 'set_active_layer': return await this.setActiveLayer(args);
-          case 'list_layers': return await this.listLayers();
-
-          // Export & Print
-          case 'export_pdf': return await this.exportPDF(args);
-          case 'export_images': return await this.exportImages(args);
-          case 'export_epub': return await this.exportEPUB(args);
-          case 'package_document': return await this.packageDocument(args);
-
-          // Utilities
-          case 'execute_indesign_code': return await this.executeInDesignCode(args.code);
-          case 'preflight_document': return await this.preflightDocument(args);
-          case 'view_document': return await this.viewDocument();
-          case 'zoom_to_page': return await this.zoomToPage(args);
-          case 'data_merge': return await this.dataMerge(args);
-
-          default:
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-        }
-      } catch (error) {
-        throw new McpError(ErrorCode.InternalError, `Error executing tool ${name}: ${error.message}`);
-      }
+      // Everything this call does inside InDesign becomes one undo step named
+      // after the tool. Without it the history fills with InDesign's own
+      // labels for each internal operation, in the interface language.
+      return withUndoLabel(name, () => this.dispatchTool(name, args));
     });
+  }
+
+  /** Route one tool call to its method. */
+  async dispatchTool(name, args) {
+    try {
+      switch (name) {
+        // Document Management
+        case 'get_document_info': return await this.getDocumentInfo();
+        case 'create_document': return await this.createDocument(args);
+        case 'open_document': return await this.openDocument(args);
+        case 'save_document': return await this.saveDocument(args);
+        case 'close_document': return await this.closeDocument(args);
+
+        // Page Management
+        case 'add_page': return await this.addPage(args);
+        case 'delete_page': return await this.deletePage(args);
+        case 'duplicate_page': return await this.duplicatePage(args);
+        case 'navigate_to_page': return await this.navigateToPage(args);
+
+        // Text Management
+        case 'get_selected_objects': return await this.getSelectedObjects();
+        case 'get_text_content': return await this.getTextContent(args);
+        case 'list_text_frames': return await this.listTextFrames(args);
+        case 'analyze_embedded_objects': return await this.analyzeEmbeddedObjects(args);
+        case 'insert_markdown_text': return await this.insertMarkdownText(args);
+        case 'fix_typography_in_selection': return await this.fixTypographyInSelection(args);
+        case 'find_typography_issues': return await this.findTypographyIssues(args);
+        case 'clean_imported_text': return await this.cleanImportedText(args);
+        case 'analyze_text_problems': return await this.analyzeTextProblems(args);
+        case 'list_grep_searches': return await this.listGrepSearches();
+        case 'create_text_frame': return await this.createTextFrame(args);
+        case 'edit_text_frame': return await this.editTextFrame(args);
+        case 'find_replace_text': return await this.findReplaceText(args);
+        case 'find_text': return await this.findText(args);
+
+        // Graphics Management
+        case 'place_image': return await this.placeImage(args);
+
+          // Layout inspection and object manipulation
+          // Generic access
+          case 'inspect_object': return await this.inspectObject(args);
+          case 'set_properties': return await this.setProperties(args);
+          case 'call_method': return await this.callMethod(args);
+
+          case 'inspect_page': return await this.inspectPage(args);
+          case 'check_layout': return await this.checkLayout(args);
+          case 'move_object': return await this.moveObject(args);
+          case 'resize_object': return await this.resizeObject(args);
+          case 'delete_object': return await this.deleteObject(args);
+          case 'arrange_object': return await this.arrangeObject(args);
+          case 'fit_frame': return await this.fitFrame(args);
+
+          // Appearance of existing objects
+          case 'format_object': return await this.formatObject(args);
+          case 'apply_effect': return await this.applyEffect(args);
+          case 'create_gradient': return await this.createGradient(args);
+          case 'format_table': return await this.formatTable(args);
+          case 'format_paragraph': return await this.formatParagraph(args);
+          case 'transform_content': return await this.transformContent(args);
+          case 'format_text': return await this.formatText(args);
+
+          // Arranging and transforming
+          case 'align_objects': return await this.alignObjects(args);
+          case 'distribute_objects': return await this.distributeObjects(args);
+          case 'group_objects': return await this.groupObjects(args);
+          case 'ungroup_objects': return await this.ungroupObjects(args);
+          case 'transform_object': return await this.transformObject(args);
+
+          // Text flow, masters, links, undo
+          case 'thread_text_frames': return await this.threadTextFrames(args);
+          case 'set_text_frame_options': return await this.setTextFrameOptions(args);
+          case 'set_text_wrap': return await this.setTextWrap(args);
+          case 'list_master_pages': return await this.listMasterPages();
+          case 'apply_master_page': return await this.applyMasterPage(args);
+          case 'insert_page_number': return await this.insertPageNumber(args);
+          case 'list_links': return await this.listLinks();
+          case 'update_links': return await this.updateLinks(args);
+          case 'undo': return await this.undoSteps(args);
+        case 'create_rectangle': return await this.createRectangle(args);
+        case 'create_ellipse': return await this.createEllipse(args);
+
+        // Style Management
+        case 'create_paragraph_style': return await this.createParagraphStyle(args);
+        case 'modify_paragraph_style': return await this.modifyParagraphStyle(args);
+        case 'create_character_style': return await this.createCharacterStyle(args);
+        case 'modify_character_style': return await this.modifyCharacterStyle(args);
+        case 'create_object_style': return await this.createObjectStyle(args);
+        case 'modify_object_style': return await this.modifyObjectStyle(args);
+        case 'apply_paragraph_style': return await this.applyParagraphStyle(args);
+        case 'apply_object_style': return await this.applyObjectStyle(args);
+        case 'list_styles': return await this.listStyles(args);
+
+        // Color Management
+        case 'create_color_swatch': return await this.createColorSwatch(args);
+        case 'list_color_swatches': return await this.listColorSwatches();
+        case 'apply_color': return await this.applyColor(args);
+
+        // Table Management
+        case 'create_table': return await this.createTable(args);
+        case 'populate_table': return await this.populateTable(args);
+
+        // Layer Management
+        case 'create_layer': return await this.createLayer(args);
+        case 'set_active_layer': return await this.setActiveLayer(args);
+        case 'list_layers': return await this.listLayers();
+
+        // Export & Print
+        case 'export_pdf': return await this.exportPDF(args);
+        case 'export_images': return await this.exportImages(args);
+        case 'export_epub': return await this.exportEPUB(args);
+        case 'package_document': return await this.packageDocument(args);
+
+        // Utilities
+        case 'execute_indesign_code': return await this.executeInDesignCode(args.code);
+        case 'preflight_document': return await this.preflightDocument(args);
+        case 'view_document': return await this.viewDocument();
+        case 'zoom_to_page': return await this.zoomToPage(args);
+        case 'data_merge': return await this.dataMerge(args);
+
+        // Shapes the generic layer cannot create
+        case 'create_polygon': return await this.createPolygon(args);
+        case 'create_line': return await this.createLine(args);
+        case 'create_anchored_frame': return await this.createAnchoredFrame(args);
+
+        // Document structure
+        case 'create_section': return await this.createSection(args);
+        case 'list_sections': return await this.listSections();
+        case 'export_idml': return await this.exportIDML(args);
+
+        default:
+          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+      }
+    } catch (error) {
+      throw new McpError(ErrorCode.InternalError, `Error executing tool ${name}: ${error.message}`);
+    }
   }
 
   // =================== CORE UTILITIES ===================
@@ -3626,7 +3806,9 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   async undoSteps(args = {}) {
-    const result = await executeInDesignScript(flow.undoSteps(args));
+    // No undo grouping for this one: InDesign refuses doc.undo() inside a
+    // script that is itself being recorded as a single undo step.
+    const result = await executeInDesignScript(flow.undoSteps(args), { undoName: null });
     return this.formatResponse(result, "Undo");
   }
 
@@ -3826,8 +4008,8 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           
           ${strokeColor ? `
             try {
-              rect.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
               rect.strokeWeight = ${measure(strokeWidth, { unit: 'pt', name: 'strokeWidth' })};
+              rect.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
             } catch (e) {}
           ` : clearDefaultStroke('rect')}
           
@@ -3864,8 +4046,8 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           
           ${strokeColor ? `
             try {
-              ellipse.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
               ellipse.strokeWeight = ${measure(strokeWidth, { unit: 'pt', name: 'strokeWidth' })};
+              ellipse.strokeColor = doc.swatches.itemByName(${str(strokeColor)});
             } catch (e) {}
           ` : clearDefaultStroke('ellipse')}
           
@@ -4497,6 +4679,39 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     this.validateDestructiveOperation(args, 'EXPORT IMAGES', args.folderPath);
     const result = await executeInDesignScript(exporters.exportImages(args));
     return this.formatResponse(result, "Export Images");
+  }
+
+  async createPolygon(args) {
+    const result = await executeInDesignScript(shapes.createPolygon(args));
+    return this.formatResponse(result, 'Create Polygon');
+  }
+
+  async createLine(args) {
+    const result = await executeInDesignScript(shapes.createLine(args));
+    return this.formatResponse(result, 'Create Line');
+  }
+
+  async createAnchoredFrame(args) {
+    const result = await executeInDesignScript(
+      shapes.createAnchoredFrame({ ...args, allowedDirs: undefined })
+    );
+    return this.formatResponse(result, 'Anchor Frame');
+  }
+
+  async createSection(args = {}) {
+    const result = await executeInDesignScript(flow.createSection(args));
+    return this.formatResponse(result, 'Create Section');
+  }
+
+  async listSections() {
+    const result = await executeInDesignScript(flow.listSections());
+    return this.formatResponse(result, 'Sections');
+  }
+
+  async exportIDML(args) {
+    this.validateDestructiveOperation(args, 'EXPORT IDML', args.filePath);
+    const result = await executeInDesignScript(exporters.exportIDML(args));
+    return this.formatResponse(result, 'Export IDML');
   }
 
   async exportEPUB(args) {
