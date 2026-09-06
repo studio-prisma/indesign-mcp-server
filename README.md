@@ -146,6 +146,62 @@ Three defects in the script templates, unrelated to platform support:
 
 ---
 
+
+---
+
+## Working without seeing the page
+
+The tools report what they did, not what the document looks like afterwards.
+That gap is where wrong layouts come from: an image import that silently
+produced nothing still answers "placed", a text frame that cannot show its
+content answers "created", and nothing mentions that two frames overlap.
+
+Three tools close it.
+
+**`inspect_page`** lists every object with its type, position, size, layer and
+state, front to back. The index it prints is the `objectIndex` the
+manipulation tools take. Indices shift whenever objects are added, deleted or
+reordered, so read it again after each of those.
+
+**`check_layout`** reports what is wrong rather than what is there:
+
+| finding | means |
+|---|---|
+| `OVERSET TEXT` | the frame cannot show all its content |
+| `EMPTY FRAME` | no artwork and no fill — an import may have failed |
+| `OFF PAGE` | the object extends past the page edge |
+| `OVERLAP` | two objects intersect, with the area and which one is in front |
+
+Run it after building a page and before exporting.
+
+**`place_image`** now verifies that the import produced artwork. A malformed
+SVG — a duplicate `xmlns` attribute is enough — leaves an empty frame behind
+in InDesign without raising anything. The tool removes that frame and returns
+an error naming the file, instead of reporting success. On success it returns
+the frame and artwork bounds and warns when the artwork is cropped.
+
+## Moving things
+
+`move_object`, `resize_object`, `delete_object`, `arrange_object` and
+`fit_frame` operate on the `objectIndex` from `inspect_page`. All measurements
+are in millimetres, positions refer to the top-left corner.
+
+`arrange_object` takes `BRING_TO_FRONT`, `BRING_FORWARD`, `SEND_BACKWARD` or
+`SEND_TO_BACK` — use it when `check_layout` reports that the wrong object is
+on top. `fit_frame` applies a fit option to something already placed:
+`PROPORTIONALLY` fits the whole image inside the frame, `FILL_PROPORTIONALLY`
+fills the frame and crops, `FRAME_TO_CONTENT` grows the frame instead.
+
+`delete_object` requires `confirmDestructive: true`.
+
+## Points and millimetres
+
+Geometry is in millimetres; `fontSize` is in points, because that is what
+InDesign uses for type. Passing a millimetre value produces text at roughly a
+third of the intended size, and nothing rejects it — 10 pt is a perfectly
+valid size. The tool descriptions say so explicitly, and a point size below
+4 pt comes back with a note suggesting the conversion. 1 mm is about 2.83 pt.
+
 ## Tests
 
 ```bash

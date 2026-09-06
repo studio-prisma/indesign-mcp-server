@@ -147,6 +147,67 @@ Drei Fehler in den Skript-Vorlagen, unabhängig von der Plattform:
 
 ---
 
+
+---
+
+## Arbeiten, ohne die Seite zu sehen
+
+Die Werkzeuge melden, was sie getan haben, nicht wie das Dokument danach
+aussieht. Aus dieser Lücke entstehen falsche Layouts: Ein Bildimport, der
+still nichts erzeugt hat, meldet trotzdem „platziert"; ein Textrahmen, der
+seinen Inhalt nicht fassen kann, meldet „angelegt"; dass zwei Rahmen
+übereinanderliegen, erwähnt niemand.
+
+Drei Werkzeuge schließen sie.
+
+**`inspect_page`** listet jedes Objekt mit Typ, Position, Größe, Ebene und
+Zustand, von vorn nach hinten. Der ausgegebene Index ist der `objectIndex`,
+den die Bearbeitungswerkzeuge erwarten. Indizes verschieben sich, sobald
+Objekte hinzukommen, gelöscht oder umsortiert werden — danach also erneut
+lesen.
+
+**`check_layout`** meldet, was nicht stimmt:
+
+| Befund | bedeutet |
+|---|---|
+| `OVERSET TEXT` | der Rahmen kann seinen Inhalt nicht vollständig zeigen |
+| `EMPTY FRAME` | keine Grafik und keine Füllung — ein Import kann fehlgeschlagen sein |
+| `OFF PAGE` | das Objekt ragt über den Seitenrand hinaus |
+| `OVERLAP` | zwei Objekte überschneiden sich, mit Fläche und Angabe, welches vorn liegt |
+
+Nach dem Aufbau einer Seite und vor dem Export laufen lassen.
+
+**`place_image`** prüft jetzt, ob der Import tatsächlich Grafik erzeugt hat.
+Eine fehlerhafte SVG — ein doppeltes `xmlns`-Attribut genügt — hinterlässt in
+InDesign einen leeren Rahmen, ohne dass etwas gemeldet wird. Das Werkzeug
+entfernt diesen Rahmen und gibt einen Fehler mit Dateinamen zurück, statt
+Erfolg zu melden. Im Erfolgsfall liefert es Rahmen- und Grafikmaße und warnt,
+wenn die Grafik beschnitten ist.
+
+## Objekte bewegen
+
+`move_object`, `resize_object`, `delete_object`, `arrange_object` und
+`fit_frame` arbeiten mit dem `objectIndex` aus `inspect_page`. Alle Maße in
+Millimetern, Positionen beziehen sich auf die obere linke Ecke.
+
+`arrange_object` nimmt `BRING_TO_FRONT`, `BRING_FORWARD`, `SEND_BACKWARD` oder
+`SEND_TO_BACK` — zu benutzen, wenn `check_layout` meldet, dass das falsche
+Objekt oben liegt. `fit_frame` wendet eine Einpassung auf bereits Platziertes
+an: `PROPORTIONALLY` passt das ganze Bild in den Rahmen, `FILL_PROPORTIONALLY`
+füllt den Rahmen und beschneidet, `FRAME_TO_CONTENT` vergrößert stattdessen
+den Rahmen.
+
+`delete_object` verlangt `confirmDestructive: true`.
+
+## Punkt und Millimeter
+
+Geometrie läuft in Millimetern, `fontSize` in Punkt — so rechnet InDesign bei
+Schrift. Ein Millimeterwert erzeugt Text in etwa einem Drittel der gewollten
+Größe, und nichts weist ihn zurück: 10 pt ist eine gültige Größe. Die
+Werkzeugbeschreibungen sagen es deshalb ausdrücklich, und ein Schriftgrad
+unter 4 pt kommt mit einem Hinweis auf die Umrechnung zurück. 1 mm sind rund
+2,83 pt.
+
 ## Tests
 
 ```bash

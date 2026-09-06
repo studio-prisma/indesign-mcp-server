@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `inspect_page` - every object on a page with type, position, size, layer and
+  state, front to back. The index it prints addresses the object in the tools
+  below.
+- `check_layout` - overset text, frames with no artwork and no fill, objects
+  past the page edge, and overlapping objects with the shared area.
+- `move_object`, `resize_object`, `delete_object`, `arrange_object`,
+  `fit_frame` - the server could create objects but not move, resize, delete
+  or restack them.
+
+### Changed
+
+- `place_image` verifies that the import produced artwork instead of reporting
+  success either way. A malformed SVG leaves an empty frame behind in
+  InDesign without raising; the tool now removes it and returns an error
+  naming the file. On success it reports frame and artwork bounds and warns
+  when the artwork is cropped.
+- `place_image` handles every fit option it accepts. `FILL_PROPORTIONALLY` and
+  `APPLY_FRAME_FITTING_OPTIONS` were in the allowed list but missing from the
+  switch, so passing either applied no fit at all and left the image at its
+  original size inside the frame.
+- `fontSize` descriptions state that the value is in points while the geometry
+  parameters are in millimetres, and a point size below 4 pt comes back with a
+  note suggesting the conversion.
+
+### Fixed
+
+- The confirmation gate for destructive operations did not gate.
+  `validateDestructiveOperation` called an async method that only throws,
+  without awaiting it, so the rejection surfaced as an unhandled rejection
+  while the caller carried on. Affected close without saving, delete page,
+  the exports, package and data merge.
+
+
 ## [1.0.0] - 2026-09-06
 
 First release of this fork of
