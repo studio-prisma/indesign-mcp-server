@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `npm run verify-api` - checks every DOM property and enum member the server
+  writes against the running InDesign and fails if one is missing. This class
+  of bug is invisible to code review and to the test suite; only the
+  application can answer it.
+
 - `format_object`, `apply_shadow`, `transform_content`, `format_text` -
   changing fill, stroke, corners, opacity, shadow, the artwork inside a frame,
   and character formatting on objects that already exist. Creating an object
@@ -53,6 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   note suggesting the conversion.
 
 ### Fixed
+
+- `export_pdf`, `export_images`, `export_epub` and `preflight_document` each
+  set a property InDesign 21.5 does not have, which aborts the whole call
+  rather than being ignored. Corrected: `includeBleedMarks` to `bleedMarks`,
+  `includeSlugArea` to `includeSlugWithPDF`, `outputIntention` dropped,
+  image `resolution` to `exportResolution`, image `useDocumentBleedWithPDF`
+  to `useDocumentBleeds`, and `app.epubExportPreferences` removed - it no
+  longer exists, so EPUB exports with the application's current settings.
+- `preflight_document` used `doc.preflightProcesses` (the collection is on
+  `app` and takes the document), read `preflightResultsData` (it is
+  `aggregatedResults`), and did not wait for the asynchronous process to
+  finish before reading its results.
+- Exports now report a missing output file instead of assuming success.
 
 - `create_rectangle` set `rect.cornerRadius`, which a rectangle does not have -
   passing a corner radius raised at runtime. Each corner carries its own
