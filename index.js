@@ -27,6 +27,9 @@ import {
   json,
   numList,
 } from './lib/jsx-safe.js';
+// Inspecting and manipulating page items. Separate module because these
+// build larger scripts than the one-liners inline below.
+import * as layout from './lib/layout-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -58,7 +61,11 @@ class InDesignMCPServer {
   }
 
   // Security: User confirmation for destructive operations
-  async requireUserConfirmation(operation, target, details = '') {
+  // Not async: it only ever throws. As an async method the rejection was
+  // never awaited by validateDestructiveOperation, so it surfaced as an
+  // unhandled rejection while the caller carried on and performed the
+  // operation anyway - the confirmation gate did not actually gate.
+  requireUserConfirmation(operation, target, details = '') {
     const warningMessage = `
 ⚠️  DESTRUCTIVE OPERATION WARNING ⚠️
 
@@ -340,7 +347,15 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               width: { type: 'number', description: 'Width in mm', default: 100 },
               height: { type: 'number', description: 'Height in mm', default: 50 },
               pageIndex: { type: 'number', description: 'Page index (0-based)', default: 0 },
-              fontSize: { type: 'number', description: 'Font size in points', default: 12 },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres. The geometry parameters ' +
+                  'on this tool (x, y, width, height) are in mm, this one is not: ' +
+                  '1 mm is about 2.83 pt. Passing a millimetre value here produces ' +
+                  'text roughly a third of the intended size.',
+                default: 12,
+              },
               fontFamily: { type: 'string', description: 'Font family name', default: 'Helvetica Neue' },
               fontStyle: { type: 'string', description: 'Font style (Regular, Bold, Italic, etc.)', default: 'Regular' },
               textColor: { type: 'string', description: 'Text color (RGB hex or name)', default: 'Black' },
@@ -360,7 +375,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               frameIndex: { type: 'number', description: 'Zero-based text frame index from list_text_frames() output. Example: Frame 0 = frameIndex: 0' },
               pageIndex: { type: 'number', description: 'Page index', default: 0 },
               content: { type: 'string', description: 'New text content' },
-              fontSize: { type: 'number', description: 'Font size in points' },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres (1 mm is about 2.83 pt).',
+              },
               fontFamily: { type: 'string', description: 'Font family name' },
               textColor: { type: 'string', description: 'Text color' },
               alignment: { type: 'string', enum: ['LEFT_ALIGN', 'CENTER_ALIGN', 'RIGHT_ALIGN', 'JUSTIFY'] },
@@ -451,7 +470,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             properties: {
               name: { type: 'string', description: 'Style name' },
               fontFamily: { type: 'string', description: 'Font family' },
-              fontSize: { type: 'number', description: 'Font size in points' },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres (1 mm is about 2.83 pt).',
+              },
               leading: { type: 'number', description: 'Leading (line spacing) in points' },
               spaceBefore: { type: 'number', description: 'Space before paragraph in mm' },
               spaceAfter: { type: 'number', description: 'Space after paragraph in mm' },
@@ -470,7 +493,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             properties: {
               styleName: { type: 'string', description: 'Paragraph style name to modify' },
               fontFamily: { type: 'string', description: 'Font family' },
-              fontSize: { type: 'number', description: 'Font size in points' },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres (1 mm is about 2.83 pt).',
+              },
               leading: { type: 'number', description: 'Leading (line spacing) in points' },
               spaceBefore: { type: 'number', description: 'Space before paragraph in mm' },
               spaceAfter: { type: 'number', description: 'Space after paragraph in mm' },
@@ -489,7 +516,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               name: { type: 'string', description: 'Style name' },
               fontFamily: { type: 'string', description: 'Font family' },
               fontStyle: { type: 'string', description: 'Font style (Regular, Bold, Italic)' },
-              fontSize: { type: 'number', description: 'Font size in points' },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres (1 mm is about 2.83 pt).',
+              },
               textColor: { type: 'string', description: 'Text color' },
               tracking: { type: 'number', description: 'Character tracking' },
               baseStyle: { type: 'string', description: 'Base style to inherit from' },
@@ -506,7 +537,11 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               styleName: { type: 'string', description: 'Character style name to modify' },
               fontFamily: { type: 'string', description: 'Font family' },
               fontStyle: { type: 'string', description: 'Font style (Regular, Bold, Italic)' },
-              fontSize: { type: 'number', description: 'Font size in points' },
+              fontSize: {
+                type: 'number',
+                description:
+                  'Font size in POINTS, not millimetres (1 mm is about 2.83 pt).',
+              },
               textColor: { type: 'string', description: 'Text color (swatch name)' },
               tracking: { type: 'number', description: 'Character tracking' },
             },
@@ -808,6 +843,145 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             required: ['dataSourcePath', 'outputFolder'],
           },
         },
+        {
+          name: 'inspect_page',
+          description:
+            'List every object on a page with its type, position, size, layer and ' +
+            'state, front to back - index 0 is the frontmost object. That index is ' +
+            'the objectIndex used by ' +
+            'move_object, resize_object, delete_object, arrange_object and fit_frame. ' +
+            'Call this before manipulating objects, and again afterwards - indices ' +
+            'shift when objects are added, deleted or reordered. All measurements in mm.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+            },
+          },
+        },
+        {
+          name: 'check_layout',
+          description:
+            'Report layout problems that the other tools do not surface: text that ' +
+            'overflows its frame, frames with no artwork and no fill (a failed import ' +
+            'looks like this), objects extending past the page edge, and overlapping ' +
+            'objects. Use it after building a page and before exporting - a layout ' +
+            'can look correct in the tool responses and still be wrong on the page.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              ignoreOverlapBelowMm: {
+                type: 'number',
+                description: 'Ignore overlaps smaller than this, in mm. Raise it when ' +
+                  'deliberate background panels are reported as findings.',
+                default: 1,
+              },
+            },
+          },
+        },
+        {
+          name: 'move_object',
+          description:
+            'Move an object. Give x/y for an absolute position, or dx/dy to offset it ' +
+            'from where it is. Position refers to the top-left corner, in mm. ' +
+            'Get objectIndex from inspect_page.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              x: { type: 'number', description: 'New left edge in mm (absolute)' },
+              y: { type: 'number', description: 'New top edge in mm (absolute)' },
+              dx: { type: 'number', description: 'Horizontal offset in mm (relative)' },
+              dy: { type: 'number', description: 'Vertical offset in mm (relative)' },
+            },
+            required: ['objectIndex'],
+          },
+        },
+        {
+          name: 'resize_object',
+          description:
+            'Resize an object, keeping its top-left corner. Dimensions in mm. ' +
+            'Artwork is refitted proportionally unless refit is false. Warns if the ' +
+            'change makes a text frame overflow. Get objectIndex from inspect_page.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              width: { type: 'number', description: 'New width in mm' },
+              height: { type: 'number', description: 'New height in mm' },
+              refit: {
+                type: 'boolean',
+                description: 'Refit contained artwork proportionally afterwards',
+                default: true,
+              },
+            },
+            required: ['objectIndex'],
+          },
+        },
+        {
+          name: 'delete_object',
+          description:
+            'Delete an object from a page. Requires confirmDestructive: true. ' +
+            'Indices of the remaining objects shift afterwards, so re-run ' +
+            'inspect_page before addressing another one.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              confirmDestructive: {
+                type: 'boolean',
+                description: 'Must be true - deleting cannot be undone through this server',
+              },
+            },
+            required: ['objectIndex'],
+          },
+        },
+        {
+          name: 'arrange_object',
+          description:
+            'Change stacking order. Use this when check_layout reports that the wrong ' +
+            'object is in front of another. Indices shift afterwards, so re-run ' +
+            'inspect_page before addressing another object.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              position: {
+                type: 'string',
+                enum: ['BRING_TO_FRONT', 'BRING_FORWARD', 'SEND_BACKWARD', 'SEND_TO_BACK'],
+                description: 'Where to move the object in the stacking order',
+              },
+            },
+            required: ['objectIndex', 'position'],
+          },
+        },
+        {
+          name: 'fit_frame',
+          description:
+            'Fit artwork to its frame or the frame to its artwork on an object that ' +
+            'is already placed. PROPORTIONALLY fits the whole image inside the frame; ' +
+            'FILL_PROPORTIONALLY fills the frame and crops; FRAME_TO_CONTENT grows the ' +
+            'frame to the artwork. Reports afterwards whether anything is still cropped.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Object index from inspect_page' },
+              fitOption: {
+                type: 'string',
+                enum: ['PROPORTIONALLY', 'FILL_PROPORTIONALLY', 'FRAME_TO_CONTENT',
+                       'CONTENT_TO_FRAME', 'CENTER_CONTENT', 'APPLY_FRAME_FITTING_OPTIONS'],
+                default: 'PROPORTIONALLY',
+              },
+            },
+            required: ['objectIndex'],
+          },
+        },
       ],
     }));
 
@@ -846,6 +1020,15 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
 
           // Graphics Management
           case 'place_image': return await this.placeImage(args);
+
+            // Layout inspection and object manipulation
+            case 'inspect_page': return await this.inspectPage(args);
+            case 'check_layout': return await this.checkLayout(args);
+            case 'move_object': return await this.moveObject(args);
+            case 'resize_object': return await this.resizeObject(args);
+            case 'delete_object': return await this.deleteObject(args);
+            case 'arrange_object': return await this.arrangeObject(args);
+            case 'fit_frame': return await this.fitFrame(args);
           case 'create_rectangle': return await this.createRectangle(args);
           case 'create_ellipse': return await this.createEllipse(args);
 
@@ -897,6 +1080,20 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   // =================== CORE UTILITIES ===================
+  /**
+   * Point sizes below 4 pt are almost always a millimetre value passed to a
+   * parameter that expects points - 10 mm becomes 10 pt, a third of the
+   * intended size. It is not an error (small type is legitimate), so this
+   * appends a note rather than rejecting the call.
+   */
+  noteIfSuspiciousFontSize(text, fontSize) {
+    if (typeof fontSize !== 'number' || fontSize >= 4 || fontSize <= 0) return text;
+    const asMm = (fontSize * 2.8346).toFixed(1);
+    return text +
+      `\n\nNote: ${fontSize} pt is very small. If you meant ${fontSize} mm, ` +
+      `pass ${asMm} instead - this parameter is in points, while x/y/width/height are in mm.`;
+  }
+
   formatResponse(result, operation = "Operation") {
     return {
       content: [
@@ -2591,7 +2788,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     `;
 
     const result = await executeInDesignScript(script);
-    return this.formatResponse(result, "Create Text Frame");
+    return this.formatResponse(
+      this.noteIfSuspiciousFontSize(result, fontSize),
+      "Create Text Frame"
+    );
   }
 
   async editTextFrame(args) {
@@ -2633,7 +2833,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     `;
 
     const result = await executeInDesignScript(script);
-    return this.formatResponse(result, "Edit Text Frame");
+    return this.formatResponse(
+      this.noteIfSuspiciousFontSize(result, fontSize),
+      "Edit Text Frame"
+    );
   }
 
   async findReplaceText(args) {
@@ -2690,11 +2893,53 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   }
 
   // =================== GRAPHICS MANAGEMENT ===================
-  async placeImage(args) {
-    const { imagePath, x = 10, y = 10, width, height, pageIndex = 0, fitOption = 'PROPORTIONALLY', createFrame = true } = args;
+  // =================== LAYOUT INSPECTION & OBJECTS ===================
 
-    // Security: Validate image path
+  async inspectPage(args = {}) {
+    const result = await executeInDesignScript(layout.inspectPage(args));
+    return this.formatResponse(result, "Inspect Page");
+  }
+
+  async checkLayout(args = {}) {
+    const result = await executeInDesignScript(layout.checkLayout(args));
+    return this.formatResponse(result, "Check Layout");
+  }
+
+  async moveObject(args) {
+    const result = await executeInDesignScript(layout.moveObject(args));
+    return this.formatResponse(result, "Move Object");
+  }
+
+  async resizeObject(args) {
+    const result = await executeInDesignScript(layout.resizeObject(args));
+    return this.formatResponse(result, "Resize Object");
+  }
+
+  async deleteObject(args) {
+    this.validateDestructiveOperation(args, 'delete object', `object ${args.objectIndex}`);
+    const result = await executeInDesignScript(layout.deleteObject(args));
+    return this.formatResponse(result, "Delete Object");
+  }
+
+  async arrangeObject(args) {
+    const result = await executeInDesignScript(layout.arrangeObject(args));
+    return this.formatResponse(result, "Arrange Object");
+  }
+
+  async fitFrame(args) {
+    const result = await executeInDesignScript(layout.fitFrame(args));
+    return this.formatResponse(result, "Fit Frame");
+  }
+
+  async placeImage(args) {
+    const {
+      imagePath, x = 10, y = 10, width, height, pageIndex = 0,
+      fitOption = 'PROPORTIONALLY', createFrame = true,
+    } = args;
+
     const validatedPath = this.validateFilePath(imagePath);
+    const frameW = width === undefined ? 50 : width;
+    const frameH = height === undefined ? 50 : height;
 
     const script = `
       if (app.documents.length === 0) {
@@ -2704,43 +2949,78 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
         try {
           var page = doc.pages[${index(pageIndex, { name: 'pageIndex' })}];
           var imageFile = File(${jsxPath(validatedPath)});
-          
+
           if (!imageFile.exists) {
-            "Image file not found: " + ${jsxPath(validatedPath)} + "";
+            "ERROR: image file not found: " + ${jsxPath(validatedPath)};
           } else {
+            var rect = null;
             ${createFrame ? `
-              var rect = page.rectangles.add();
-              ${width && height ? `
-                rect.geometricBounds = [${measure(y, { unit: 'mm', name: 'y' })}, ${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y + height, { unit: 'mm', name: 'y' })}, ${measure(x + width, { unit: 'mm', name: 'x' })}];
-              ` : `
-                rect.geometricBounds = [${measure(y, { unit: 'mm', name: 'y' })}, ${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y + 50, { unit: 'mm', name: 'y' })}, ${measure(x + 50, { unit: 'mm', name: 'x' })}];
-              `}
+              rect = page.rectangles.add();
+              rect.geometricBounds = [
+                ${measure(y, { unit: 'mm', name: 'y' })},
+                ${measure(x, { unit: 'mm', name: 'x' })},
+                ${measure(y + frameH, { unit: 'mm', name: 'height' })},
+                ${measure(x + frameW, { unit: 'mm', name: 'width' })}
+              ];
               rect.place(imageFile);
             ` : `
-              page.place(imageFile, [${measure(x, { unit: 'mm', name: 'x' })}, ${measure(y, { unit: 'mm', name: 'y' })}]);
-              var rect = page.rectangles[page.rectangles.length - 1];
+              var placed = page.place(imageFile, [
+                ${measure(y, { unit: 'mm', name: 'y' })},
+                ${measure(x, { unit: 'mm', name: 'x' })}
+              ]);
+              if (placed && placed.length > 0) { rect = placed[0].parent; }
             `}
-            
-            // Apply fit option
-            switch (${str(fitOption)}) {
-              case "PROPORTIONALLY":
-                rect.fit(FitOptions.PROPORTIONALLY);
-                break;
-              case "FRAME_TO_CONTENT":
-                rect.fit(FitOptions.FRAME_TO_CONTENT);
-                break;
-              case "CONTENT_TO_FRAME":
-                rect.fit(FitOptions.CONTENT_TO_FRAME);
-                break;
-              case "CENTER_CONTENT":
-                rect.fit(FitOptions.CENTER_CONTENT);
-                break;
+
+            // Did the import actually produce artwork? A malformed SVG or an
+            // unsupported format leaves an empty frame behind, and reporting
+            // success there sends the caller looking in the wrong place.
+            if (rect === null || !rect.isValid) {
+              "ERROR: placing produced no frame for " + imageFile.name;
+            } else if (rect.allGraphics.length === 0) {
+              rect.remove();
+              "ERROR: no artwork imported from " + imageFile.name +
+                ". The file exists but InDesign read nothing from it. " +
+                "For SVG, check that the XML is well formed - a duplicate " +
+                "xmlns attribute is enough to make the import fail silently.";
+            } else {
+              var graphic = rect.allGraphics[0];
+              var linkState = "embedded";
+              if (graphic.itemLink !== null) {
+                linkState = String(graphic.itemLink.status).replace("LinkStatus.", "");
+              }
+
+              switch (${str(fitOption)}) {
+                case "NONE": break;
+                case "PROPORTIONALLY":      rect.fit(FitOptions.PROPORTIONALLY); break;
+                case "FILL_PROPORTIONALLY": rect.fit(FitOptions.FILL_PROPORTIONALLY); break;
+                case "FRAME_TO_CONTENT":    rect.fit(FitOptions.FRAME_TO_CONTENT); break;
+                case "CONTENT_TO_FRAME":    rect.fit(FitOptions.CONTENT_TO_FRAME); break;
+                case "CENTER_CONTENT":      rect.fit(FitOptions.CENTER_CONTENT); break;
+                case "APPLY_FRAME_FITTING_OPTIONS":
+                  rect.fit(FitOptions.APPLY_FRAME_FITTING_OPTIONS); break;
+                default:
+                  throw new Error("unknown fitOption: " + ${str(fitOption)});
+              }
+
+              // Report what is actually on the page, and whether the artwork
+              // sticks out of its frame - that is what "cropped" looks like.
+              var fb = rect.geometricBounds;
+              var gb = rect.allGraphics[0].geometricBounds;
+              var cropped = (gb[0] < fb[0] - 0.01) || (gb[1] < fb[1] - 0.01) ||
+                            (gb[2] > fb[2] + 0.01) || (gb[3] > fb[3] + 0.01);
+
+              "Placed " + imageFile.name + " on page " +
+                (${index(pageIndex, { name: 'pageIndex' })} + 1) +
+                " | frame " + fb[1].toFixed(1) + "," + fb[0].toFixed(1) +
+                " to " + fb[3].toFixed(1) + "," + fb[2].toFixed(1) + " mm" +
+                " | artwork " + gb[1].toFixed(1) + "," + gb[0].toFixed(1) +
+                " to " + gb[3].toFixed(1) + "," + gb[2].toFixed(1) + " mm" +
+                " | link " + linkState +
+                (cropped ? " | WARNING: artwork extends beyond the frame and is cropped" : "");
             }
-            
-            "Image placed: " + imageFile.name + " on page " + (${index(pageIndex, { name: 'pageIndex' })} + 1);
           }
         } catch (e) {
-          "Error placing image: " + e.message;
+          "ERROR placing image: " + e.message;
         }
       }
     `;

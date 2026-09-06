@@ -38,8 +38,13 @@ export async function loadServer() {
   const dir = path.join(os.tmpdir(), `indesign-mcp-test-${crypto.randomBytes(6).toString('hex')}`);
   fs.mkdirSync(path.join(dir, 'lib'), { recursive: true });
 
-  // Keep the real escaping helpers — they are part of what is under test.
-  fs.copyFileSync(path.join(ROOT, 'lib', 'jsx-safe.js'), path.join(dir, 'lib', 'jsx-safe.js'));
+  // Copy every library module except the driver — they are part of what is
+  // under test. Copying the whole directory rather than naming files keeps
+  // this working when a module is added.
+  for (const file of fs.readdirSync(path.join(ROOT, 'lib'))) {
+    if (file === 'indesign-driver.js') continue;
+    fs.copyFileSync(path.join(ROOT, 'lib', file), path.join(dir, 'lib', file));
+  }
   fs.writeFileSync(path.join(dir, 'lib', 'indesign-driver.js'), MOCK_DRIVER, 'utf8');
 
   let code = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
