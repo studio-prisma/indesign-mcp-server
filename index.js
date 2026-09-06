@@ -40,6 +40,8 @@ import * as text from './lib/text-tools.js';
 import * as style from './lib/style-tools.js';
 // Export and preflight.
 import * as exporters from './lib/export-tools.js';
+// Effects, gradients, tables, paragraphs.
+import * as fx from './lib/effect-tools.js';
 
 class InDesignMCPServer {
   constructor() {
@@ -1345,20 +1347,39 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           }
         },
         {
-          name: 'apply_shadow',
+          name: 'apply_effect',
           description:
-            'Add or remove a drop shadow on an object. Offsets and blur in mm, ' +
-            'opacity in percent. Pass enabled: false to remove it.',
+            'Apply or remove any of the nine InDesign effects, and set the blend ' +
+            'mode. Replaces the shadow-only tool. Not every option applies to every ' +
+            'effect - distance and angle are meaningful for shadows, size for glows ' +
+            'and feathers - and options an effect does not support are reported as ' +
+            'ignored rather than failing the call. Sizes in mm, opacity in percent.',
           inputSchema: {
             type: 'object',
             properties: {
               pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
               objectIndex: { type: 'number', description: 'Object index from inspect_page' },
-              enabled: { type: 'boolean', default: true },
-              opacity: { type: 'number', default: 75 },
-              xOffset: { type: 'number', description: 'Horizontal offset in mm', default: 2 },
-              yOffset: { type: 'number', description: 'Vertical offset in mm', default: 2 },
-              blur: { type: 'number', description: 'Blur radius in mm', default: 3 }
+              effect: {
+                type: 'string',
+                enum: ['DROP_SHADOW', 'INNER_SHADOW', 'OUTER_GLOW', 'INNER_GLOW',
+                       'BEVEL_EMBOSS', 'SATIN', 'BASIC_FEATHER',
+                       'DIRECTIONAL_FEATHER', 'GRADIENT_FEATHER'],
+                default: 'DROP_SHADOW'
+              },
+              enabled: { type: 'boolean', description: 'false removes the effect', default: true },
+              opacity: { type: 'number', description: 'Effect opacity in percent' },
+              size: { type: 'number', description: 'Blur or feather width in mm' },
+              distance: { type: 'number', description: 'Offset in mm, shadows only' },
+              angle: { type: 'number', description: 'Angle in degrees, shadows only' },
+              effectColor: { type: 'string', description: 'Swatch name for the effect colour' },
+              blendMode: {
+                type: 'string',
+                enum: ['NORMAL', 'MULTIPLY', 'SCREEN', 'OVERLAY', 'SOFT_LIGHT',
+                       'HARD_LIGHT', 'COLOR_DODGE', 'COLOR_BURN', 'DARKEN',
+                       'LIGHTEN', 'DIFFERENCE', 'EXCLUSION', 'HUE',
+                       'SATURATION', 'COLOR', 'LUMINOSITY']
+              },
+              objectOpacity: { type: 'number', description: 'Opacity of the object itself, percent' }
             },
             required: ['objectIndex']
           }
@@ -1416,6 +1437,98 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             required: ['frameIndex']
           }
         },
+        {
+          name: 'create_gradient',
+          description:
+            'Create a linear or radial gradient from existing swatches, and ' +
+            'optionally fill an object with it. Stops are { color, location } ' +
+            'where colour is a swatch name and location runs 0 to 100; at least ' +
+            'two are needed. Reusing a name updates that gradient.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Name for the gradient swatch' },
+              type: { type: 'string', enum: ['LINEAR', 'RADIAL'], default: 'LINEAR' },
+              stops: {
+                type: 'array',
+                description: 'At least two stops',
+                items: {
+                  type: 'object',
+                  properties: {
+                    color: { type: 'string', description: 'Existing swatch name' },
+                    location: { type: 'number', description: '0 to 100' }
+                  },
+                  required: ['color']
+                }
+              },
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              objectIndex: { type: 'number', description: 'Optional: fill this object with it' },
+              angle: { type: 'number', description: 'Gradient angle in degrees' }
+            },
+            required: ['name', 'stops']
+          }
+        },
+        {
+          name: 'format_table',
+          description:
+            'Format a table: cell fill, borders, insets, vertical alignment, ' +
+            'column widths, header and footer rows. Tables live in stories rather ' +
+            'than on pages, so they are addressed by index across the document - ' +
+            'create_table reports the index it used. rowRange limits which rows ' +
+            'the cell settings touch.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              tableIndex: { type: 'number', description: 'Table index across the document', default: 0 },
+              rowRange: {
+                type: 'string',
+                enum: ['all', 'header', 'body', 'range'],
+                description: 'Which rows the cell settings apply to',
+                default: 'all'
+              },
+              firstRow: { type: 'number', description: 'First row, for rowRange range' },
+              lastRow: { type: 'number', description: 'Last row, for rowRange range' },
+              fillColor: { type: 'string', description: 'Swatch name, or "None"' },
+              fillTint: { type: 'number', description: 'Tint in percent' },
+              borderWeight: { type: 'number', description: 'Cell border weight in points' },
+              borderColor: { type: 'string', description: 'Swatch name for cell borders' },
+              verticalAlign: {
+                type: 'string',
+                enum: ['TOP_ALIGN', 'CENTER_ALIGN', 'BOTTOM_ALIGN', 'JUSTIFY_ALIGN']
+              },
+              cellInset: { type: 'number', description: 'Inset on all four sides in mm' },
+              columnWidths: {
+                type: 'array', items: { type: 'number' },
+                description: 'Column widths in mm, first to last'
+              },
+              headerRows: { type: 'number', description: 'How many rows repeat as header' },
+              footerRows: { type: 'number' }
+            }
+          }
+        },
+        {
+          name: 'format_paragraph',
+          description:
+            'Paragraph settings on placed text: indents, space before and after, ' +
+            'hyphenation, keeping lines together. format_text covers character ' +
+            'attributes; these are the paragraph ones. Measurements in mm. ' +
+            'Applies to every paragraph in the frame\'s story.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              pageIndex: { type: 'number', description: 'Page index, 0-based', default: 0 },
+              frameIndex: { type: 'number', description: 'Text frame index on that page' },
+              leftIndent: { type: 'number', description: 'in mm' },
+              rightIndent: { type: 'number', description: 'in mm' },
+              firstLineIndent: { type: 'number', description: 'in mm' },
+              spaceBefore: { type: 'number', description: 'in mm' },
+              spaceAfter: { type: 'number', description: 'in mm' },
+              hyphenation: { type: 'boolean' },
+              keepLinesTogether: { type: 'boolean' }
+            },
+            required: ['frameIndex']
+          }
+        },
       ],
     }));
 
@@ -1467,7 +1580,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
 
             // Appearance of existing objects
             case 'format_object': return await this.formatObject(args);
-            case 'apply_shadow': return await this.applyShadow(args);
+            case 'apply_effect': return await this.applyEffect(args);
+            case 'create_gradient': return await this.createGradient(args);
+            case 'format_table': return await this.formatTable(args);
+            case 'format_paragraph': return await this.formatParagraph(args);
             case 'transform_content': return await this.transformContent(args);
             case 'format_text': return await this.formatText(args);
 
@@ -3225,9 +3341,24 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     return this.formatResponse(result, "Format Object");
   }
 
-  async applyShadow(args) {
-    const result = await executeInDesignScript(style.applyShadow(args));
-    return this.formatResponse(result, "Drop Shadow");
+  async applyEffect(args) {
+    const result = await executeInDesignScript(fx.applyEffect(args));
+    return this.formatResponse(result, "Apply Effect");
+  }
+
+  async createGradient(args) {
+    const result = await executeInDesignScript(fx.createGradient(args));
+    return this.formatResponse(result, "Create Gradient");
+  }
+
+  async formatTable(args = {}) {
+    const result = await executeInDesignScript(fx.formatTable(args));
+    return this.formatResponse(result, "Format Table");
+  }
+
+  async formatParagraph(args) {
+    const result = await executeInDesignScript(fx.formatParagraph(args));
+    return this.formatResponse(result, "Format Paragraph");
   }
 
   async transformContent(args) {

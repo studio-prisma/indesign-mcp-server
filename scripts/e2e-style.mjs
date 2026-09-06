@@ -15,6 +15,7 @@ import path from 'path';
 import { executeInDesignScript, platformInfo } from '../lib/indesign-driver.js';
 import { str, measure, num } from '../lib/jsx-safe.js';
 import * as style from '../lib/style-tools.js';
+import * as fx from '../lib/effect-tools.js';
 import * as arrange from '../lib/arrange-tools.js';
 import * as layout from '../lib/layout-tools.js';
 
@@ -134,11 +135,11 @@ try {
   ok('format_object: unknown swatch lists what the document has');
 
   const shadow = noError(
-    await run(style.applyShadow({ objectIndex: picIdx, opacity: 60, blur: 4 })),
-    'apply_shadow'
+    await run(fx.applyEffect({ objectIndex: picIdx, effect: 'DROP_SHADOW', opacity: 60, size: 4 })),
+    'apply_effect'
   );
-  if (!/Drop shadow/.test(shadow)) fail('shadow not reported: ' + shadow);
-  ok('apply_shadow: ' + shadow.trim().slice(0, 62));
+  if (!/DROP_SHADOW applied/.test(shadow)) fail('shadow not reported: ' + shadow);
+  ok('apply_effect: ' + shadow.trim().slice(0, 62));
 
   // --- text ---------------------------------------------------------------
   const retext = noError(await run(`

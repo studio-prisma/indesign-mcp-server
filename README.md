@@ -319,6 +319,30 @@ asynchronously - without `waitForProcess()` the results are read before it has
 finished.
 
 
+
+## Effects, gradients, tables and paragraphs
+
+`apply_effect` covers all nine effects - drop and inner shadow, outer and
+inner glow, bevel and emboss, satin, and the three feathers - plus the sixteen
+blend modes and the object's own opacity. It replaces the shadow-only tool.
+Not every option applies to every effect: distance and angle are meaningful
+for shadows, size for glows and feathers. Options an effect does not support
+are reported as ignored rather than failing the call.
+
+`create_gradient` builds a linear or radial gradient from existing swatches
+and optionally fills an object with it. Stops are `{ color, location }`, at
+least two.
+
+`format_table` handles cell fill, borders, insets, vertical alignment, column
+widths and header rows. `rowRange` limits which rows the cell settings touch -
+`header`, `body`, `all`, or an explicit range. Tables live in stories rather
+than on pages, so they are addressed by index across the document.
+
+`format_paragraph` sets indents, space before and after, hyphenation and
+keeping lines together. `format_text` covers the character attributes; these
+are the paragraph ones, neither of which needs a style to be defined first.
+
+
 ## Tests
 
 ```bash
