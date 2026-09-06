@@ -31,6 +31,70 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Last code character of a line — strings and comments skipped.
+ * Returns '' for lines without code.
+ */
+function lastCodeChar(line) {
+  let last = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '/' && line[i + 1] === '/') break;
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i++;
+      while (i < line.length) {
+        if (line[i] === '\\') { i += 2; continue; }
+        if (line[i] === quote) break;
+        i++;
+      }
+      last = quote;
+      continue;
+    }
+    if (!/\s/.test(ch)) last = ch;
+  }
+  return last;
+}
+
+// Statements that yield no usable value — never prefixed.
+const NON_EXPRESSION =
+  /^(var|let|const|if|for|while|do|switch|function|try|return|throw|break|continue|with)\b/;
+
+/**
+ * Assign a script's trailing expression to __result__.
+ *
+ * The assignment may legitimately land inside a block; `var` hoisting covers
+ * that. Scripts that set __result__ themselves are left alone.
+ */
+function autoCaptureResult(script) {
+  if (/\b__result__\b/.test(script)) return script;
+
+  const lines = script.split('\n');
+
+  let end = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].trim();
+    if (t && !t.startsWith('//') && !t.startsWith('}')) { end = i; break; }
+  }
+  if (end < 0) return script;
+
+  let start = end;
+  for (;;) {
+    let prev = -1;
+    for (let i = start - 1; i >= 0; i--) { if (lines[i].trim()) { prev = i; break; } }
+    if (prev < 0) break;
+    const ch = lastCodeChar(lines[prev]);
+    if (ch === '' || ch === ';' || ch === '{' || ch === '}') break;
+    start = prev;
+  }
+
+  const head = lines[start].trim();
+  if (NON_EXPRESSION.test(head) || /^[)\]}]/.test(head)) return script;
+
+  lines[start] = lines[start].replace(/^(\s*)/, '$1var __result__ = ');
+  return lines.join('\n');
+}
+
 class InDesignMCPServer {
   constructor() {
     this.server = new Server(
@@ -945,24 +1009,14 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     // Wrap script to capture return value via temp file
     const resultPath = tempResult.replace(/\\/g, '/');
     
-    // Auto-capture last expression: prepend __result__ = to last non-empty line
-    const lines = script.split('\n');
-    let lastExprIdx = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const trimmed = lines[i].trim();
-      if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('}')) {
-        lastExprIdx = i;
-        break;
-      }
-    }
-    if (lastExprIdx >= 0) {
-      const lastLine = lines[lastExprIdx].trim();
-      // Don't prepend for statements that aren't expressions
-      if (!/^(var |let |const |if |for |while |switch |function |try |\/\/)/.test(lastLine)) {
-        lines[lastExprIdx] = 'var __result__ = ' + lines[lastExprIdx];
-      }
-    }
-    const processedScript = lines.join('\n');
+    // Auto-capture the trailing expression: assign it to __result__.
+    //
+    // The trailing expression may span several lines. Prefixing the *last*
+    // line puts the assignment in the middle of the expression, which is a
+    // syntax error — create_document has such an expression. So walk back to
+    // where the statement starts: as long as the preceding line does not end
+    // in ';', '{' or '}', it belongs to the same statement.
+    const processedScript = autoCaptureResult(script);
     
     const wrappedScript = `
       try {
@@ -1833,7 +1887,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
           
           if (textFrame) {
             // Convert markdown to formatted text
-            var markdownContent = \`${markdownText.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+            var markdownContent = ${str(markdownText)};
             
             ${replaceContent ? 'textFrame.contents = "";' : ''}
             
@@ -2062,7 +2116,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
               var beforeQuotes = (story.contents.match(/"/g) || []).length;
               if (beforeQuotes > 0) {
                 // Simple quote replacement (could be enhanced)
-                story.contents = story.contents.replace(/"/g, "„").replace(/„/g, """).replace(/"/g, "„");
+                var __q__ = 0;
+                story.contents = story.contents.replace(/"/g, function () {
+                  return (__q__++ % 2 === 0) ? "\u201E" : "\u201C";
+                });
                 changeLog += "Fixed " + Math.floor(beforeQuotes/2) + " quote pair(s)\\n";
                 changes += Math.floor(beforeQuotes/2);
               }
