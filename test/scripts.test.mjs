@@ -127,7 +127,11 @@ const CREATORS = ['createTextFrame', 'createRectangle', 'createEllipse',
 
 test('a new frame carries no stroke unless one was asked for', async () => {
   for (const method of CREATORS) {
-    const args = { ...ARGS };
+    // place_image validates its path against INDESIGN_ALLOWED_DIRS, which
+    // defaults to the home directory. os.tmpdir() sits under home on some
+    // machines and outside it on the CI runners, so the path has to come from
+    // homedir() or this test passes locally and fails in CI.
+    const args = { ...ARGS, imagePath: path.join(os.homedir(), 'stroke-test.jpg') };
     delete args.strokeColor;
 
     const { error, script } = await runTool(method, args);
