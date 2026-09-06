@@ -51,13 +51,22 @@ jobs:
           fi
           echo "Version $VERSION confirmed."
 
-      - name: Build install package
+      # npm pack rather than a build script: package.json's "files" already
+      # lists what belongs in the package, and a second list would drift.
+      - name: Build package
         id: build
         run: |
           TAG="${{ steps.tag.outputs.name }}"
           VERSION="${TAG#v}"
-          ./tools/build-zip.sh "$VERSION"
-          echo "asset=dist/indesign-mcp-server-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          npm ci --omit=dev
+          npm pack
+          ASSET="indesign-mcp-server-${VERSION}.tgz"
+          if [ ! -f "$ASSET" ]; then
+            echo "::error::npm pack did not produce $ASSET"
+            ls -la ./*.tgz || true
+            exit 1
+          fi
+          echo "asset=${ASSET}" >> "$GITHUB_OUTPUT"
 
       - name: Extract CHANGELOG section for this version
         id: changelog
