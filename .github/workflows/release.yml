@@ -33,14 +33,18 @@ jobs:
           ref: ${{ steps.tag.outputs.name }}
           fetch-depth: 0
 
-      # Version gate. The manifest is the single source of the version; if it
-      # disagrees with the tag, the release is wrong and stops here. Replace the
-      # extraction with whatever this project's manifest is.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Version gate. package.json is the single source of the version; if it
+      # disagrees with the tag, the release is wrong and stops here.
       - name: Verify manifest version matches the tag
         run: |
           TAG="${{ steps.tag.outputs.name }}"
           VERSION="${TAG#v}"
-          MANIFEST=$(echo "REPLACE_ME")   # e.g. grep -oP "\"version\":\s*\"\K[^\"]+" manifest.json
+          MANIFEST=$(node -p "require('./package.json').version")
           if [ "$MANIFEST" != "$VERSION" ]; then
             echo "::error::Manifest declares '$MANIFEST' but the tag is '$VERSION'."
             exit 1

@@ -37,9 +37,13 @@ jobs:
 
       - name: No macOS-only execution left in index.js
         run: |
-          if grep -qEi "osascript|applescript|tell application" index.js; then
+          # Comment lines are excluded on purpose: the file explains where
+          # execution moved to, and naming osascript in that sentence is not
+          # the same as calling it.
+          hits=$(grep -nEi "osascript|applescript|tell application" index.js                  | grep -vE "^[0-9]+: *(//|\*)" || true)
+          if [ -n "$hits" ]; then
             echo "::error::index.js still contains macOS-only execution paths"
-            grep -nEi "osascript|applescript|tell application" index.js
+            echo "$hits"
             exit 1
           fi
 
