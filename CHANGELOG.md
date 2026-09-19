@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-19
+
+A text-encoding release. Every file the driver generates now carries a UTF-8
+signature, so German copy survives the way into InDesign and German error
+messages survive the way back. `DoScript` loses its second call shape.
+
 ### Fixed
 
 - **Non-ASCII text in the PowerShell runner was read in the ANSI codepage.**
@@ -23,9 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Jürgen` is enough — and then every call fails on `Test-Path`, because the
   path in the runner no longer matches the file on disk.
 
-  The `.jsx` gets the same BOM. ExtendScript auto-detects UTF-8 there in
-  InDesign 21.5, verified byte-for-byte on `äöüß`, `€`, `—` and `✓`, but that
-  detection is a heuristic and the BOM makes it a guarantee.
+  The `.jsx` gets the same BOM, and there the fix is not precautionary.
+  ExtendScript sniffs only the **first 2048 bytes** of a script for UTF-8. A
+  file whose first non-ASCII byte falls before that boundary is decoded
+  correctly; one where it falls at or after byte 2048 is read in the ANSI
+  codepage, and every umlaut past that point is destroyed. Measured against
+  InDesign 21.6 by walking a single `Ü` through a file of ASCII filler:
+
+  | First non-ASCII byte | charCode that arrives in InDesign |
+  |---|---|
+  | 21 | 220, correct |
+  | 2008 | 220, correct |
+  | 2048 | 195, destroyed |
+  | 8285 | 195, destroyed |
+
+  Any generated script longer than roughly two kilobytes that carries its
+  umlauts in the body rather than the head runs into this — filling a text
+  frame with German copy is enough. The BOM removes the sniffing entirely.
 
 - **InDesign error messages came back as `�`.** Windows PowerShell writes
   stdout and stderr in the console's OEM codepage — CP850 on a German system —
@@ -334,7 +354,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v1.0.0...v2.0.0

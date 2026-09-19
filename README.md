@@ -5,7 +5,7 @@
 [![InDesign 21.x](https://img.shields.io/badge/InDesign-21.x-ff3366.svg)](https://www.adobe.com/products/indesign.html)
 [![Node 18+](https://img.shields.io/badge/Node-18%2B-339933.svg)](https://nodejs.org/)
 [![Tools 89](https://img.shields.io/badge/tools-89-6236ff.svg)](#what-it-can-do)
-[![Tests 306](https://img.shields.io/badge/tests-306-brightgreen.svg)](#tests)
+[![Tests 315](https://img.shields.io/badge/tests-315-brightgreen.svg)](#tests)
 
 Drive Adobe InDesign from Claude Desktop or any MCP client — build documents,
 place text and images, restyle and rearrange what is already there, check the
