@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Non-ASCII text in the PowerShell runner was read in the ANSI codepage.**
+  The driver wrote the generated `.ps1` as UTF-8 without a BOM, and Windows
+  PowerShell 5.1 falls back to the ANSI codepage when a script file has no
+  BOM. On a German system CP1252 reads the two UTF-8 bytes of `Ü` as `Ã` and
+  `œ` — one character in, two characters out, charCodes 195 and 339. Both
+  generated files now carry a UTF-8 BOM.
+
+  What made this latent rather than constant is that everything the runner
+  currently interpolates happens to be ASCII: the temp path and the undo
+  label, which is sanitised to `[A-Za-z0-9 _.-]`. It goes live the moment
+  `os.tmpdir()` contains a non-ASCII character — a Windows account named
+  `Jürgen` is enough — and then every call fails on `Test-Path`, because the
+  path in the runner no longer matches the file on disk.
+
+  The `.jsx` gets the same BOM. ExtendScript auto-detects UTF-8 there in
+  InDesign 21.5, verified byte-for-byte on `äöüß`, `€`, `—` and `✓`, but that
+  detection is a heuristic and the BOM makes it a guarantee.
+
+- **InDesign error messages came back as `�`.** Windows PowerShell writes
+  stdout and stderr in the console's OEM codepage — CP850 on a German system —
+  while the driver decodes them as UTF-8, so every umlaut in an error message
+  became U+FFFD. That also degraded `explainFailure()`, which matches on German
+  wording to recognise the modal-dialog case. The runner now sets
+  `[Console]::OutputEncoding` to UTF-8 as its first statement.
+
+### Changed
+
+- **`DoScript` is always called with five arguments.** The ungrouped path —
+  the one the `undo` tool uses — took the two-argument overload instead, so
+  grouped and ungrouped calls resolved different COM overloads. It now passes
+  `UndoModes.SCRIPT_REQUEST`, which is the only one of the four undo modes
+  under which `doc.undo()` still works: `AUTO_UNDO`, `FAST_ENTIRE_SCRIPT` and
+  `ENTIRE_SCRIPT` all make InDesign refuse with "the last command cannot be
+  undone", verified against InDesign 21.5. Behaviour is unchanged; what goes
+  away is the second call shape.
+
+### Added
+
+- `test/driver.test.mjs`, the first tests to exercise the driver itself rather
+  than the mock — the text it hands to PowerShell and the encoding of the files
+  it writes. `npm run e2e-driver` is the counterpart that needs InDesign: it
+  checks that text survives the round trip into a document and back by
+  charCode, and that the `undo` tool works through the ungrouped path.
+
 ## [2.2.0] - 2026-09-06
 
 Undo becomes usable, the server can say things a tool description cannot, and

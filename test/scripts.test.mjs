@@ -192,7 +192,11 @@ test('the driver groups a script into one named undo step', async () => {
 
   assert.match(src, /UNDO_ENTIRE_SCRIPT = 1699963733/,
     'the undo mode must be the value read out of InDesign, not a guess');
-  assert.match(src, /DoScript\(\$script, \$\{ID_JAVASCRIPT\}, @\(\), \$\{UNDO_ENTIRE_SCRIPT\}/,
+  assert.match(src, /UNDO_SCRIPT_REQUEST = 1699967573/,
+    'the ungrouped mode must be the value read out of InDesign, not a guess');
+  // The shape of the call is asserted against the generated text in
+  // test/driver.test.mjs, which is where a regression would actually show.
+  assert.match(src, /DoScript\(\$script, \$\{ID_JAVASCRIPT\}, @\(\), \$\{undoMode\}/,
     'withArguments has to be @() - $null raises inside the COM interop');
   assert.match(src, /undo mode entire script undo name/,
     'macOS needs the same grouping');
