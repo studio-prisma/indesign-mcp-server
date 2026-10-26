@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # build-provenance attestation
+  attestations: write
 
 jobs:
   release:
@@ -78,6 +80,14 @@ jobs:
           fi
           echo "asset=${ASSET}" >> "$GITHUB_OUTPUT"
 
+
+      # Signed statement that this file was built by this workflow from this
+      # commit. Check a downloaded package with:
+      #   gh attestation verify <file> --repo ${{ github.repository }}
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.build.outputs.asset }}
       - name: Extract CHANGELOG section for this version
         id: changelog
         run: |
