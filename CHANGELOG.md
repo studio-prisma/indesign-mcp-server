@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-26
+
+A security release with one breaking change: `INDESIGN_ALLOWED_DIRS` no
+longer adds to the home directory, it replaces it. The dependency audit is
+clean again.
+
+**Upgrading:** if you set `INDESIGN_ALLOWED_DIRS` and relied on files under
+your home directory being reachable as well, add those folders to the list.
+Without the variable nothing changes. Calls that used `call_method` with
+`save` or `exportFile` must switch to `save_document` and the `export_*`
+tools.
+
 ### Security
 
 - `call_method` no longer accepts `save` and `exportFile`. Their path arguments
@@ -17,6 +29,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `INDESIGN_ALLOWED_DIRS` now replaces the home directory instead of adding to
   it. Before, a narrow working folder still left the whole home directory open
   for reading and writing. Without the variable, home stays the limit.
+- `@modelcontextprotocol/sdk` 1.30.0 → 1.32.2 and a refresh of the
+  lockfile clear all seven audit findings (one critical, three high). On the
+  stdio path only zod and fast-uri were actually loaded; the HTTP-side
+  packages (express, hono, proxy-addr) never were.
+
+### Changed
+
+- Dependabot now watches npm as well, with minor and patch updates grouped
+  weekly. Before, only GitHub Actions were covered.
+- CI lints every module under `lib/` instead of three, and tests on Node 24
+  in addition to 20 and 22.
+- The release workflow reads the tag from `env` and accepts `vX.Y.Z` and
+  `vX.Y.Z-rc.N` only, instead of expanding the tag input straight into shell
+  code.
 
 ## [2.2.1] - 2026-09-19
 
@@ -365,7 +391,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...v3.0.0
 [2.2.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.0.0...v2.1.0
