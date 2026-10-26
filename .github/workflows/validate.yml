@@ -28,9 +28,8 @@ jobs:
 
       - name: Syntax check
         run: |
-          node --check index.js
-          node --check lib/indesign-driver.js
-          node --check lib/jsx-safe.js
+          # npm run lint covers index.js and every module under lib/.
+          npm run lint
           node --check scripts/smoke.mjs
           node --check scripts/e2e.mjs
           for f in test/*.mjs; do node --check "$f"; done
@@ -58,7 +57,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         # The server itself runs on Node 18; the test runner is only
         # stable from Node 20, so that is what the suite is checked on.
-        node: [20, 22]
+        node: [20, 22, 24]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
