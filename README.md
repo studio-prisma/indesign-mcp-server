@@ -105,7 +105,9 @@ work; it noticeably reduces the number of calls that go nowhere.
 
 `INDESIGN_ALLOWED_DIRS` confines every file operation to the listed
 directories. The separator is the platform's path delimiter — `;` on Windows,
-`:` on macOS. Keep it narrow: a working folder, not your home directory.
+`:` on macOS. Without it, the limit is your home directory. Keep it narrow: a
+working folder, not your home directory. Once set, the home directory is no
+longer allowed on top of it.
 
 Do **not** set `INDESIGN_ALLOW_ARBITRARY_CODE`. It unlocks a tool that runs
 arbitrary ExtendScript and bypasses every check described here.

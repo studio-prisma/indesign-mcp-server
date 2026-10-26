@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `call_method` no longer accepts `save` and `exportFile`. Their path arguments
+  reached ExtendScript without `validateFilePath()`, so a prompt-injected call
+  could write a document export anywhere, an autostart folder included. Saving
+  and exporting stay available through `save_document` and the `export_*`
+  tools, which check the path.
+- `INDESIGN_ALLOWED_DIRS` now replaces the home directory instead of adding to
+  it. Before, a narrow working folder still left the whole home directory open
+  for reading and writing. Without the variable, home stays the limit.
+
 ## [2.2.1] - 2026-09-19
 
 A text-encoding release. Every file the driver generates now carries a UTF-8

@@ -1698,7 +1698,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
             'bringToFront, bringForward, sendBackward, sendToBack, flipItem, ' +
             'move, resize, duplicate, select, clearTransformations, detach, ' +
             'override, changeText, changeGrep, merge, unmerge, convertToText, ' +
-            'ungroup, recompose, save, exportFile. Arguments are typed like ' +
+            'ungroup, recompose. Arguments are typed like ' +
             'property values. Methods outside the list are refused - this is a ' +
             'way to act on objects, not a way to run scripts.',
           inputSchema: {

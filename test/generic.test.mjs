@@ -122,6 +122,20 @@ test('only allow-listed methods can be called', () => {
   assert.ok(!g.ALLOWED_METHODS.includes('eval'));
 });
 
+test('methods that write files are not callable', () => {
+  // Their path arguments would bypass validateFilePath(); save_document and
+  // the export_* tools are the checked way to write.
+  const startup = 'C:/Users/u/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/x.cmd';
+  for (const m of ['save', 'exportFile', 'saveACopy', 'place', 'open']) {
+    assert.ok(!g.ALLOWED_METHODS.includes(m), `${m} is on the list`);
+    assert.throws(
+      () => g.callMethod({ target: { kind: 'document' }, method: m, args: [startup] }),
+      /Invalid value/,
+      `${m} accepted`
+    );
+  }
+});
+
 test('the target kind is checked against the allow-list', () => {
   assert.throws(
     () => g.inspectObject({ target: { kind: 'document; app.quit()' } }),
@@ -193,7 +207,7 @@ test('call arguments are typed like property values', () => {
     /must be an array/
   );
   noCodeEscaped(
-    g.callMethod({ target: { kind: 'document' }, method: 'save', args: [BREAKOUT] }),
+    g.callMethod({ target: { kind: 'pageItem', objectIndex: 0 }, method: 'move', args: [BREAKOUT] }),
     'call argument'
   );
 });
