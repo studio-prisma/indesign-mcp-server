@@ -16,7 +16,7 @@ import { autoCaptureResult } from '../lib/indesign-driver.js';
 import * as exporters from '../lib/export-tools.js';
 
 // Under the home directory on purpose: file operations are confined to
-// buildAllowedDirs(), which is home plus INDESIGN_ALLOWED_DIRS. os.tmpdir()
+// buildAllowedDirs(), which is home unless INDESIGN_ALLOWED_DIRS is set. os.tmpdir()
 // sits under home on Windows but not on Linux, so a temp path passes here
 // and is refused on CI. Nothing is written - only the script text is built.
 const BASE = os.homedir();

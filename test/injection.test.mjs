@@ -12,9 +12,11 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import { runTool, parses } from './harness.mjs';
 import {
-  str, num, index, measure, enumOf, bool, ALLOWED, validateFilePath,
+  str, num, index, measure, enumOf, bool, ALLOWED, validateFilePath, buildAllowedDirs,
 } from '../lib/jsx-safe.js';
 
 const BS = String.fromCharCode(92);      // backslash
@@ -159,6 +161,27 @@ test('validateFilePath(): system and outside paths are rejected', () => {
     : '/etc/x.indd';
   assert.throws(() => validateFilePath(outside, [process.cwd()]), /Access denied/);
   assert.throws(() => validateFilePath('', [process.cwd()]), /Invalid file path/);
+});
+
+test('buildAllowedDirs(): home is a fallback, not an addition', () => {
+  const saved = process.env.INDESIGN_ALLOWED_DIRS;
+  const work = path.join(os.tmpdir(), 'indesign-work');
+  try {
+    process.env.INDESIGN_ALLOWED_DIRS = work;
+    const dirs = buildAllowedDirs();
+    assert.deepEqual(dirs, [path.resolve(work)]);
+    assert.throws(
+      () => validateFilePath(path.join(os.homedir(), '.ssh', 'authorized_keys'), dirs),
+      /Access denied/
+    );
+    process.env.INDESIGN_ALLOWED_DIRS = ` ${path.delimiter} `;
+    assert.deepEqual(buildAllowedDirs(), [path.resolve(os.homedir())], 'blank list falls back to home');
+    delete process.env.INDESIGN_ALLOWED_DIRS;
+    assert.deepEqual(buildAllowedDirs(), [path.resolve(os.homedir())], 'unset falls back to home');
+  } finally {
+    if (saved === undefined) delete process.env.INDESIGN_ALLOWED_DIRS;
+    else process.env.INDESIGN_ALLOWED_DIRS = saved;
+  }
 });
 
 // ---------------------------------------------------------------- end-to-end
