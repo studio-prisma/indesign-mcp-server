@@ -56,6 +56,8 @@ COM-Objekt nicht.
 
 ## Einrichten
 
+Schritt für Schritt mit Abbruchpunkten, Security-Gate und Notaus: [docs/INSTALL.de.md](docs/INSTALL.de.md). Die Kurzfassung:
+
 ```bash
 npm ci
 npm run smoke

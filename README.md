@@ -54,6 +54,8 @@ find the COM object.
 
 ## Setup
 
+Step by step with stop points, security gate and kill switch: [docs/INSTALL.md](docs/INSTALL.md). The short version:
+
 ```bash
 npm ci
 npm run smoke
