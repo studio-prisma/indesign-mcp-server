@@ -7,11 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-27
+
+A security patch: arbitrary ExtendScript can only be unlocked with the exact
+value `INDESIGN_ALLOW_ARBITRARY_CODE=1`. Adds step-by-step installation guides.
+
 ### Security
 
 - `INDESIGN_ALLOW_ARBITRARY_CODE` unlocks `execute_indesign_code` only for the
   exact value `1`. Before, every value except empty, `0` and `false` did, so
   `no` or `off` switched arbitrary ExtendScript on.
+
+### Documentation
+
+- `docs/INSTALL.md` and `docs/INSTALL.de.md`: prerequisites with stop points,
+  working folder, Claude Desktop entry, functional test, security gate with the
+  expected messages, kill switch and update path.
 
 ## [3.0.0] - 2026-10-26
 
@@ -397,7 +408,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...v3.0.0
 [2.2.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.1.0...v2.2.0
