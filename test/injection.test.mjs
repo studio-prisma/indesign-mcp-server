@@ -261,3 +261,18 @@ test('execute_indesign_code stays locked without the opt-in', async () => {
   const locked = Boolean(error) || script === null || /disabled|not enabled/i.test(String(script));
   assert.ok(locked, 'executeInDesignCode was reachable without INDESIGN_ALLOW_ARBITRARY_CODE');
 });
+
+test('execute_indesign_code opens only for the exact value 1', async () => {
+  const saved = process.env.INDESIGN_ALLOW_ARBITRARY_CODE;
+  try {
+    for (const value of ['no', 'off', 'False', 'yes', 'true', ' 1', '2']) {
+      process.env.INDESIGN_ALLOW_ARBITRARY_CODE = value;
+      const { error, script } = await runTool('executeInDesignCode', { code: 'app.quit();' });
+      const locked = Boolean(error) || script === null || /disabled|not enabled/i.test(String(script));
+      assert.ok(locked, `INDESIGN_ALLOW_ARBITRARY_CODE=${JSON.stringify(value)} unlocked the tool`);
+    }
+  } finally {
+    if (saved === undefined) delete process.env.INDESIGN_ALLOW_ARBITRARY_CODE;
+    else process.env.INDESIGN_ALLOW_ARBITRARY_CODE = saved;
+  }
+});

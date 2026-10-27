@@ -4754,9 +4754,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
   async executeInDesignCode(args) {
     const code = (typeof args === 'string') ? args : args.code;
     
-    // Security: Check if arbitrary code execution is allowed
+    // Security: Check if arbitrary code execution is allowed. Only the exact
+    // value "1" opts in; "no", "off" or a typo must keep the tool locked.
     const allowArbitraryCode = process.env.INDESIGN_ALLOW_ARBITRARY_CODE;
-    if (!allowArbitraryCode || allowArbitraryCode === '0' || allowArbitraryCode.toLowerCase() === 'false') {
+    if (allowArbitraryCode !== '1') {
       throw new McpError(
         ErrorCode.InvalidRequest,
         `Arbitrary code execution is disabled for security reasons.
