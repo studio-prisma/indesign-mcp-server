@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `INDESIGN_ALLOW_ARBITRARY_CODE` unlocks `execute_indesign_code` only for the
+  exact value `1`. Before, every value except empty, `0` and `false` did, so
+  `no` or `off` switched arbitrary ExtendScript on.
+
 ## [3.0.0] - 2026-10-26
 
 A security release with one breaking change: `INDESIGN_ALLOWED_DIRS` no
