@@ -99,8 +99,25 @@ test('place_image reports a failed import instead of claiming success', async ()
     'place_image does not verify that the import produced artwork');
   assert.match(script, /ERROR: no artwork imported/,
     'place_image has no failure path for an empty import');
-  assert.match(script, /FILL_PROPORTIONALLY/,
-    'place_image does not handle every fit option it accepts');
+});
+
+test('place_image handles every fit option it accepts', async () => {
+  const placeArgs = { imagePath: os.tmpdir() + '/does-not-matter.svg', pageIndex: 0 };
+  // The values of the fitOption enum in the place_image schema.
+  for (const fitOption of ['PROPORTIONALLY', 'FILL_PROPORTIONALLY', 'FRAME_TO_CONTENT',
+    'CONTENT_TO_FRAME', 'CENTER_CONTENT', 'APPLY_FRAME_FITTING_OPTIONS']) {
+    const { error, script } = await runTool('placeImage', { ...placeArgs, fitOption });
+    if (error) return;                     // path rejection is a valid outcome
+    assert.ok(script.includes(`rect.fit(FitOptions.${fitOption});`),
+      `place_image does not apply fitOption ${fitOption}`);
+  }
+  const none = await runTool('placeImage', { ...placeArgs, fitOption: 'NONE' });
+  assert.ok(!/rect\.fit\(/.test(none.script), 'fitOption NONE must not fit the image');
+  const bogus = await runTool('placeImage', { ...placeArgs, fitOption: 'FitOptions.CONTENT_AWARE_FIT); x(' });
+  assert.ok(!/rect\.fit\(/.test(bogus.script),
+    'an unknown fitOption must not reach the identifier position');
+  assert.match(bogus.script, /throw new Error\("unknown fitOption: "/,
+    'an unknown fitOption must fail at run time');
 });
 
 // ------------------------------------------------------------ unit guardrail
