@@ -102,6 +102,13 @@ jobs:
       - name: actionlint
         uses: raven-actions/actionlint@v2
 
+  # Zentraler Security-Scan: gitleaks, TruffleHog, Trivy, Semgrep (alle blockierend).
+  # Semgrep blockiert nur neue Funde. Version: Commit des Release-Tags, siehe Kommentar.
+  security:
+    uses: studio-prisma/github-config-security-workflow/.github/workflows/security.yml@346fbc812810930cf8916ba683ceab0b1dbef033 # v1.0.1
+    with:
+      semgrep-rules: "p/javascript p/security-audit"
+
   # ---------------------------------------------------------------------------
   # Do not rename. "Gate" is the single required status check in the branch
   # ruleset of every studio-prisma repo. Add new jobs to `needs`, nothing else.
@@ -112,7 +119,7 @@ jobs:
   gate:
     name: Gate
     runs-on: ubuntu-latest
-    needs: [lint, test, audit, actionlint]
+    needs: [lint, test, audit, security, actionlint]
     if: always()
     steps:
       - name: Fail unless every job succeeded
