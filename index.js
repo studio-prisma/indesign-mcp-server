@@ -81,6 +81,29 @@ function clearDefaultStroke(varName) {
             } catch (e) {}`;
 }
 
+// Standard paper sizes, portrait, in millimetres: [width, height].
+const PAPER_SIZES_MM = {
+  A3: [297, 420],
+  A4: [210, 297],
+  A5: [148, 210],
+  Letter: [215.9, 279.4],
+  Legal: [215.9, 355.6],
+};
+
+/** ['210mm', '297mm'] for a known preset (swapped for Landscape), else null. */
+function paperSize(preset, orientation) {
+  if (!Object.hasOwn(PAPER_SIZES_MM, preset)) return null;
+  const [w, h] = PAPER_SIZES_MM[preset];
+  const [width, height] = orientation === 'Landscape' ? [h, w] : [w, h];
+  return [`${width}mm`, `${height}mm`];
+}
+
+// fitOption values place_image passes to rect.fit(); NONE skips fitting.
+const PLACE_FIT_OPTIONS = new Set([
+  'PROPORTIONALLY', 'FILL_PROPORTIONALLY', 'FRAME_TO_CONTENT',
+  'CONTENT_TO_FRAME', 'CENTER_CONTENT', 'APPLY_FRAME_FITTING_OPTIONS',
+]);
+
 class InDesignMCPServer {
   constructor() {
     this.server = new Server(
@@ -2116,24 +2139,12 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
       ${preset === 'Custom' && width && height ? `
         doc.documentPreferences.pageWidth = ${measure(width, { unit: 'mm', name: 'width' })};
         doc.documentPreferences.pageHeight = ${measure(height, { unit: 'mm', name: 'height' })};
+      ` : paperSize(preset, orientation) ? `
+        // Standard preset ${str(preset)}
+        doc.documentPreferences.pageWidth = ${str(paperSize(preset, orientation)[0])};
+        doc.documentPreferences.pageHeight = ${str(paperSize(preset, orientation)[1])};
       ` : `
-        // Standard presets
-        if (${str(preset)} === "A4") {
-          doc.documentPreferences.pageWidth = "" + ${str(orientation === 'Landscape' ? '297mm' : '210mm')} + "";
-          doc.documentPreferences.pageHeight = "" + ${str(orientation === 'Landscape' ? '210mm' : '297mm')} + "";
-        } else if (${str(preset)} === "A5") {
-          doc.documentPreferences.pageWidth = "" + ${str(orientation === 'Landscape' ? '210mm' : '148mm')} + "";
-          doc.documentPreferences.pageHeight = "" + ${str(orientation === 'Landscape' ? '148mm' : '210mm')} + "";
-        } else if (${str(preset)} === "A3") {
-          doc.documentPreferences.pageWidth = "" + ${str(orientation === 'Landscape' ? '420mm' : '297mm')} + "";
-          doc.documentPreferences.pageHeight = "" + ${str(orientation === 'Landscape' ? '297mm' : '420mm')} + "";
-        } else if (${str(preset)} === "Letter") {
-          doc.documentPreferences.pageWidth = "" + ${str(orientation === 'Landscape' ? '279.4mm' : '215.9mm')} + "";
-          doc.documentPreferences.pageHeight = "" + ${str(orientation === 'Landscape' ? '215.9mm' : '279.4mm')} + "";
-        } else if (${str(preset)} === "Legal") {
-          doc.documentPreferences.pageWidth = "" + ${str(orientation === 'Landscape' ? '355.6mm' : '215.9mm')} + "";
-          doc.documentPreferences.pageHeight = "" + ${str(orientation === 'Landscape' ? '215.9mm' : '355.6mm')} + "";
-        }
+        // Unknown preset: keep InDesign's default page size
       `}
       
       // Document setup
@@ -3926,18 +3937,10 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
                 linkState = String(graphic.itemLink.status).replace("LinkStatus.", "");
               }
 
-              switch (${str(fitOption)}) {
-                case "NONE": break;
-                case "PROPORTIONALLY":      rect.fit(FitOptions.PROPORTIONALLY); break;
-                case "FILL_PROPORTIONALLY": rect.fit(FitOptions.FILL_PROPORTIONALLY); break;
-                case "FRAME_TO_CONTENT":    rect.fit(FitOptions.FRAME_TO_CONTENT); break;
-                case "CONTENT_TO_FRAME":    rect.fit(FitOptions.CONTENT_TO_FRAME); break;
-                case "CENTER_CONTENT":      rect.fit(FitOptions.CENTER_CONTENT); break;
-                case "APPLY_FRAME_FITTING_OPTIONS":
-                  rect.fit(FitOptions.APPLY_FRAME_FITTING_OPTIONS); break;
-                default:
-                  throw new Error("unknown fitOption: " + ${str(fitOption)});
-              }
+              ${fitOption === 'NONE' ? '// fitOption NONE: keep the placed size'
+                // Only whitelisted names reach the identifier position.
+                : PLACE_FIT_OPTIONS.has(fitOption) ? `rect.fit(FitOptions.${fitOption});`
+                : `throw new Error("unknown fitOption: " + ${str(fitOption)});`}
 
               // Report what is actually on the page, and whether the artwork
               // sticks out of its frame - that is what "cropped" looks like.
