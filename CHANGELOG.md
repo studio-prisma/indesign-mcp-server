@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-24
+
+A security release with one breaking change: file access is off until
+`INDESIGN_ALLOWED_DIRS` names a folder. Closes audit findings ID-1 to ID-4
+(2026-11-03).
+
+**Upgrading:** if you run the server without `INDESIGN_ALLOWED_DIRS`, the
+tools that open, place, save or export files now refuse with a message naming
+the variable. Set it to your working folder (several folders separated by `;`
+on Windows, `:` on macOS). Files must carry the extension the tool expects,
+for example `.pdf` for `export_pdf`. `set_properties` on the application only
+takes the find/change preferences.
+
+### Security
+
+- **Fail-closed file access (ID-3).** Without `INDESIGN_ALLOWED_DIRS` no file
+  operation is allowed. The home directory is no longer the default, so a
+  prompt-injected export can no longer reach `~/.ssh` or an autostart folder
+  on an unconfigured install.
+- **URI escapes refused (ID-1).** ExtendScript's `File()` decodes `%2E%2E` to
+  `..` after the server checked the path. Paths containing `%`, control
+  characters or a UNC prefix are now refused.
+- **Sensitive folders refused (ID-3).** Inside an allowed directory, `.ssh`,
+  `.gnupg`, `.aws`, `.git`, autostart and systemd folders, the Windows Startup
+  folder, `LaunchAgents`/`LaunchDaemons`, Adobe and InDesign script folders and
+  shell or PowerShell profiles are refused.
+- **Extension per tool (ID-3).** `open_document` takes `.indd/.indt/.idml`,
+  `save_document` `.indd/.indt`, `export_pdf` `.pdf`, `export_epub` `.epub`,
+  `export_idml` `.idml`, `place_image` and anchored frames image formats,
+  data merge sources `.csv/.txt`.
+- **Links resolved (ID-4).** Symlinks and junctions inside an allowed folder
+  are resolved before the check, so a link pointing outside is refused. The
+  resolved path is what reaches ExtendScript.
+- **`set_properties` deny-list (ID-2).** Properties that hold a file, folder,
+  path, URL or script (`filePath`, `epubExportPreferences.javascripts`,
+  `scriptPreferences`, …), `parent` and prototype names are refused. On the
+  application only `find*/change*` preferences can be set, which keeps the
+  documented GREP route working.
+
 ## [3.0.1] - 2026-10-27
 
 A security patch: arbitrary ExtendScript can only be unlocked with the exact
@@ -408,7 +447,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.1...v4.0.0
 [3.0.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...v3.0.0
 [2.2.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...v2.2.1

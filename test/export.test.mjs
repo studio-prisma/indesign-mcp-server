@@ -6,6 +6,7 @@
  * looked broken for reasons unrelated to what it was asked to do.
  */
 
+import './allow-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';

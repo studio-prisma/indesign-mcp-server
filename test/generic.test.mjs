@@ -78,13 +78,13 @@ test('a property path cannot carry code', () => {
     'pages[0]',
     'a b',
     'name /* */ ',
-    '__proto__.x',      // starts with an underscore, not a plain name
+    '__proto__.x',      // prototype access, refused by the deny-list
     '',
     'a.'.repeat(8) + 'b', // too deep
   ]) {
     assert.throws(
       () => g.setProperties({ target: { kind: 'document' }, properties: { [bad]: 1 } }),
-      /Invalid property path/,
+      /Invalid property path|not allowed/,
       `path accepted: ${JSON.stringify(bad)}`
     );
   }

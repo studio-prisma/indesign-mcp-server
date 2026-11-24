@@ -11,9 +11,10 @@ Grenzen unten kann er Dokumente öffnen, ändern, speichern, exportieren und
 schließen sowie Dateien lesen und schreiben.
 
 - **Dateizugriffe sind begrenzt** auf die Verzeichnisse in
-  `INDESIGN_ALLOWED_DIRS`. Ohne die Variable ist die Grenze dein
-  **Home-Verzeichnis** — inklusive Autostart-Ordner und `~/.ssh`. Setzen
-  (Schritt 4).
+  `INDESIGN_ALLOWED_DIRS`. Ohne die Variable ist **kein Dateizugriff
+  erlaubt** — Öffnen, Platzieren, Speichern und Exportieren brechen mit einem
+  Hinweis auf die Variable ab. Setzen (Schritt 4). Schlüssel-, Autostart- und
+  Skriptordner bleiben auch innerhalb erlaubter Verzeichnisse gesperrt.
 - **Prompt-Injection ist der realistische Angriff.** Text in einem Dokument,
   ein Dateiname oder ein Bild können Anweisungen an das Modell enthalten. Der
   Server prüft jedes Argument und verweigert Pfade außerhalb der erlaubten

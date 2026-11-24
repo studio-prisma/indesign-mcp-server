@@ -15,6 +15,8 @@ import * as exporters from '../lib/export-tools.js';
 
 const LABEL = 'MCP-E2E-EXPORT';
 const DIR = path.join(os.tmpdir(), 'indesign-mcp-e2e-export');
+// File access is off unless INDESIGN_ALLOWED_DIRS is set (fail-closed); allow the run folder.
+if (!process.env.INDESIGN_ALLOWED_DIRS) process.env.INDESIGN_ALLOWED_DIRS = DIR;
 fs.rmSync(DIR, { recursive: true, force: true });
 fs.mkdirSync(DIR, { recursive: true });
 

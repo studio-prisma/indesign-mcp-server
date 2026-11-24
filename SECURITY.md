@@ -27,7 +27,12 @@ Expected response: an acknowledgement within 7 days, an assessment within 30. Th
   data. Escaping is the property this project exists to provide; a payload
   that leaves its string literal is a real finding.
 - A file operation that escapes `INDESIGN_ALLOWED_DIRS`, including through
-  symlinks, UNC paths, alternate data streams or path normalisation.
+  symlinks, UNC paths, alternate data streams, URI escapes or path
+  normalisation, or that reaches a refused folder (credentials, autostart,
+  script folders) or writes an extension the tool does not take.
+- A file operation that succeeds while `INDESIGN_ALLOWED_DIRS` is unset.
+- A `set_properties` path that writes a file, folder, path or script
+  property, or an application setting other than the find/change preferences.
 - Reaching `execute_indesign_code` without `INDESIGN_ALLOW_ARBITRARY_CODE`
   being set.
 - A temp file that is readable or writable by another local user, or that

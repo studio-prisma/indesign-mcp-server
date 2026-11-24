@@ -107,9 +107,11 @@ work; it noticeably reduces the number of calls that go nowhere.
 
 `INDESIGN_ALLOWED_DIRS` confines every file operation to the listed
 directories. The separator is the platform's path delimiter — `;` on Windows,
-`:` on macOS. Without it, the limit is your home directory. Keep it narrow: a
-working folder, not your home directory. Once set, the home directory is no
-longer allowed on top of it.
+`:` on macOS. Without it, no tool can open, place, save or export a file.
+Keep it narrow: a working folder, not your home directory. Inside the allowed
+folders, credential, autostart and script folders (`.ssh`, Startup,
+`LaunchAgents`, Adobe script folders, shell profiles) stay refused, and every
+file tool only takes the extensions it works with.
 
 Do **not** set `INDESIGN_ALLOW_ARBITRARY_CODE`. It unlocks a tool that runs
 arbitrary ExtendScript and bypasses every check described here.
