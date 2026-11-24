@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-24
+
 A security release with one breaking change: file access is off until
 `INDESIGN_ALLOWED_DIRS` names a folder. Closes audit findings ID-1 to ID-4
 (2026-11-03).
@@ -445,7 +447,8 @@ First release of this fork of
 - **`insert_markdown_text`** emitted a template literal into the ExtendScript.
   ExtendScript is ES3 and has no template literals.
 
-[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/studio-prisma/indesign-mcp-server/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.1...v4.0.0
 [3.0.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.1...v3.0.0
 [2.2.1]: https://github.com/studio-prisma/indesign-mcp-server/compare/v2.2.0...v2.2.1
