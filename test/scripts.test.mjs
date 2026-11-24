@@ -6,6 +6,7 @@
  * script text — a broken template would otherwise surface inside InDesign.
  */
 
+import './allow-home.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';

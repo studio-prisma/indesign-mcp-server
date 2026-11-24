@@ -110,9 +110,12 @@ Aufrufe, die ins Leere laufen, spürbar.
 
 `INDESIGN_ALLOWED_DIRS` begrenzt jede Dateioperation auf die genannten
 Verzeichnisse. Der Trenner ist der Plattform-Trenner — `;` unter Windows, `:`
-unter macOS. Ohne die Variable ist das Home-Verzeichnis die Grenze. Eng
-halten: ein Arbeitsordner, nicht das Home-Verzeichnis. Ist die Variable
-gesetzt, ist das Home-Verzeichnis nicht mehr zusätzlich erlaubt.
+unter macOS. Ohne die Variable kann kein Werkzeug eine Datei öffnen,
+platzieren, speichern oder exportieren. Eng halten: ein Arbeitsordner, nicht
+das Home-Verzeichnis. Auch innerhalb der erlaubten Ordner bleiben Schlüssel-,
+Autostart- und Skriptordner gesperrt (`.ssh`, Autostart, `LaunchAgents`,
+Adobe-Skriptordner, Shell-Profile), und jedes Dateiwerkzeug nimmt nur die
+Endungen an, mit denen es arbeitet.
 
 `INDESIGN_ALLOW_ARBITRARY_CODE` **nicht** setzen. Die Variable schaltet ein
 Werkzeug frei, das beliebiges ExtendScript ausführt, und umgeht damit jede

@@ -163,7 +163,7 @@ test('validateFilePath(): system and outside paths are rejected', () => {
   assert.throws(() => validateFilePath('', [process.cwd()]), /Invalid file path/);
 });
 
-test('buildAllowedDirs(): home is a fallback, not an addition', () => {
+test('buildAllowedDirs(): the list replaces home, and no list means no access', () => {
   const saved = process.env.INDESIGN_ALLOWED_DIRS;
   const work = path.join(os.tmpdir(), 'indesign-work');
   try {
@@ -175,9 +175,9 @@ test('buildAllowedDirs(): home is a fallback, not an addition', () => {
       /Access denied/
     );
     process.env.INDESIGN_ALLOWED_DIRS = ` ${path.delimiter} `;
-    assert.deepEqual(buildAllowedDirs(), [path.resolve(os.homedir())], 'blank list falls back to home');
+    assert.deepEqual(buildAllowedDirs(), [], 'a blank list allows nothing');
     delete process.env.INDESIGN_ALLOWED_DIRS;
-    assert.deepEqual(buildAllowedDirs(), [path.resolve(os.homedir())], 'unset falls back to home');
+    assert.deepEqual(buildAllowedDirs(), [], 'unset allows nothing (fail-closed)');
   } finally {
     if (saved === undefined) delete process.env.INDESIGN_ALLOWED_DIRS;
     else process.env.INDESIGN_ALLOWED_DIRS = saved;

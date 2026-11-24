@@ -11,8 +11,10 @@ it can open, change, save, export and close documents, and read and write
 files.
 
 - **File access is confined** to the directories in `INDESIGN_ALLOWED_DIRS`.
-  Without that variable the limit is your **home directory** — that includes
-  autostart folders and `~/.ssh`. Set it (step 4).
+  Without that variable **no file operation is allowed** — opening, placing,
+  saving and exporting refuse with a message naming the variable. Set it
+  (step 4). Credential, autostart and script folders stay refused even inside
+  an allowed directory.
 - **Prompt injection is the realistic attack.** Text inside a document, a file
   name or an image can carry instructions to the model. The server validates
   every argument and refuses paths outside the allowed directories, but it

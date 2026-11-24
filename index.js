@@ -26,6 +26,7 @@ import {
   ALLOWED,
   validateFilePath,
   buildAllowedDirs,
+  EXT,
   jsxPath,
   json,
   numList,
@@ -122,7 +123,7 @@ class InDesignMCPServer {
       }
     );
 
-    // Allowed directories: home plus INDESIGN_ALLOWED_DIRS, split on
+    // Allowed directories: only INDESIGN_ALLOWED_DIRS (fail-closed), split on
     // path.delimiter — ';' on Windows, so a drive letter stays intact.
     this.allowedDirectories = buildAllowedDirs();
 
@@ -134,8 +135,8 @@ class InDesignMCPServer {
    * Path validation — delegates to lib/jsx-safe.js, which is
    * platform-aware. Kept as a method so the call sites stay unchanged.
    */
-  validateFilePath(filePath) {
-    return validateFilePath(filePath, this.allowedDirectories);
+  validateFilePath(filePath, opts) {
+    return validateFilePath(filePath, this.allowedDirectories, opts);
   }
 
   // Security: User confirmation for destructive operations
@@ -2184,7 +2185,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     const { filePath } = args;
     
     // Security: Validate file path
-    const validatedPath = this.validateFilePath(filePath);
+    const validatedPath = this.validateFilePath(filePath, { extensions: EXT.document });
     
     const script = `
       try {
@@ -2213,7 +2214,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
     }
     
     // Security: Validate file path if provided
-    const validatedPath = filePath ? this.validateFilePath(filePath) : null;
+    const validatedPath = filePath ? this.validateFilePath(filePath, { extensions: EXT.save }) : null;
     
     const script = `
       if (app.documents.length === 0) {
@@ -3884,7 +3885,7 @@ CAUTION: Only do this if you understand the risks and have verified the operatio
       fitOption = 'PROPORTIONALLY', createFrame = true,
     } = args;
 
-    const validatedPath = this.validateFilePath(imagePath);
+    const validatedPath = this.validateFilePath(imagePath, { extensions: EXT.image });
     const frameW = width === undefined ? 50 : width;
     const frameH = height === undefined ? 50 : height;
 
@@ -5030,7 +5031,7 @@ Usage: INDESIGN_ALLOW_ARBITRARY_CODE=1 node index.js`
     this.validateDestructiveOperation(args, 'DATA MERGE', `${outputFolder} (will create multiple files)`);
 
     // Security: Validate both data source and output paths
-    const validatedDataSource = this.validateFilePath(dataSourcePath);
+    const validatedDataSource = this.validateFilePath(dataSourcePath, { extensions: EXT.dataSource });
     const validatedOutputFolder = this.validateFilePath(outputFolder);
 
     const script = `
@@ -5078,6 +5079,10 @@ Usage: INDESIGN_ALLOW_ARBITRARY_CODE=1 node index.js`
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('Complete InDesign MCP server running on stdio');
+    if (this.allowedDirectories.length === 0) {
+      console.error('INDESIGN_ALLOWED_DIRS is not set: tools that open, place, save ' +
+        'or export files are disabled until it names at least one folder.');
+    }
   }
 }
 

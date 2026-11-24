@@ -21,6 +21,8 @@ import * as exporters from '../lib/export-tools.js';
 
 const LABEL = 'MCP-E2E-SHAPE';
 const IDML = path.join(os.homedir(), 'mcp-e2e-shape.idml');
+// File access is off unless INDESIGN_ALLOWED_DIRS is set (fail-closed); allow home for this run.
+if (!process.env.INDESIGN_ALLOWED_DIRS) process.env.INDESIGN_ALLOWED_DIRS = os.homedir();
 
 let step = 0;
 const ok = (m) => console.log('  [' + (++step) + '] ' + m);
