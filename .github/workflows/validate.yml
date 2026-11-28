@@ -19,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
@@ -61,10 +61,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
 
@@ -79,10 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
@@ -97,15 +97,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: actionlint
-        uses: studio-prisma/github-config-security-workflow/.github/actions/actionlint@e2f8b2c8a2b01aa21dd901a73c971594a5366485 # v1.2.0
+        uses: studio-prisma/github-config-security-workflow/.github/actions/actionlint@2a6e60b71951334b84bb1982a0f319d94fb6aff4 # v1.2.0
 
   # Zentraler Security-Scan: gitleaks, TruffleHog, Trivy, Semgrep (alle blockierend).
   # Semgrep blockiert nur neue Funde. Version: Commit des Release-Tags, siehe Kommentar.
   security:
-    uses: studio-prisma/github-config-security-workflow/.github/workflows/security.yml@510cea39c4ecb83fb25fdfca88649dc014eae883 # v1.1.0
+    uses: studio-prisma/github-config-security-workflow/.github/workflows/security.yml@2a6e60b71951334b84bb1982a0f319d94fb6aff4 # v1.2.0
     with:
       semgrep-rules: "p/javascript p/security-audit"
     secrets:
