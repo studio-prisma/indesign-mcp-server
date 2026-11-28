@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - CI: all GitHub actions pinned to commit SHAs instead of tags; actionlint runs from the shared
-  action in `github-config-security-workflow` with checksum check (security workflow v1.2.0).
+  action in `github-config-security-workflow` with checksum check (security workflow v1.2.1).
 
 ## [4.0.0] - 2026-11-24
 
