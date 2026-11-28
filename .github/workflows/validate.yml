@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: actionlint
-        uses: raven-actions/actionlint@v2
+        uses: studio-prisma/github-config-security-workflow/.github/actions/actionlint@e2f8b2c8a2b01aa21dd901a73c971594a5366485 # v1.2.0
 
   # Zentraler Security-Scan: gitleaks, TruffleHog, Trivy, Semgrep (alle blockierend).
   # Semgrep blockiert nur neue Funde. Version: Commit des Release-Tags, siehe Kommentar.
